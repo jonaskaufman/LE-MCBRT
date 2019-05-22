@@ -14,10 +14,9 @@ If an interaction point is generated, the primary ray is consumed and deposits s
 The remaining (1-f*l_ep) of the primary ray's energy is distributed equally to k_s secondary rays, whose angles are drawn randomly from a uniform distribution.
 For simplicity, the secondary rays originate from the center of the pixel at which the interaction occured.
 
-Secondary rays are traced pixel by pixel. For each pixel visited, the ray deposits energy g*L_ep or all of its energy, whichever is smaller.
+Secondary rays are traced pixel by pixel. For each pixel visited, the ray deposits energy g*l_ep or all of its energy, whichever is smaller. (is g necessary? could just scale E_0)
 Secondary rays are removed when they have zero energy.
 
 If any ray exits the grid, it is simply removed (no reflections). 
 
 The simulation proceeds until some number of primary rays R have been processed, along with their resulting secondary rays.
-

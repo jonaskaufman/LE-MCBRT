@@ -1,4 +1,4 @@
-/// Global definitions
+/// Global definitions (maybe make these constructor arguments?)
 #define N 1000      /// pixels per side
 #define E0 1.0      /// initial primary ray energy
 #define d 1.0       /// source distance
@@ -8,7 +8,7 @@
 #define G 0.1       /// secondary ray deposition constant
 
 
-class Simulation
+class SimulationSerial
 {
     public: 
     /// Label the pixel edges
