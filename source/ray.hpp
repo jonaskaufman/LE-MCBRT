@@ -1,12 +1,13 @@
-/// Global definitions
-#define a 1.0       /// primary ray interaction probability scaling
-#define F 0.5       /// primary ray interaction energy fraction
-#define G 0.1       /// secondary ray deposition constant
-
+#include parameters.hpp
 
 class Ray
 {
     public:
+    Ray() = delete;
+
+    /// Constructor
+    Ray(const bool primary, const double angle, std::pair<int> current_pixel, Simulation::PIXEL_EDGE current_edge, double current_edge_dist);
+
     /// Evolve ray by one step, return a tuple of:
     ///     - i,j for pixel visited
     ///     - energy deposited to that pixel
@@ -22,11 +23,14 @@ class Ray
     double m_current_edge_dist;             /// current distance along edge (from TOP or LEFT)
 
     /// Determine whether primary ray interacts at current pixel
-    bool _interact();
+    bool _random_interact();
     
     /// Trace ray through current pixel and return:
     ///     - distance travelled in pixel
     ///     - i,j for next pixel
     std::pair<double, std::pair<int>> _trace(); 
+
+    /// Generate secondary rays from primary ray
+    std::vector<Ray> _spawn_secondary_rays();
 
 }
