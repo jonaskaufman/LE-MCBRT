@@ -1,7 +1,9 @@
-
+#ifndef PARAMETERS_H
+#define PARAMETERS_H
 
 //#define N 1000      /// pixels per side
-#define D 100.0     /// source distance
+#define D 10.0     /// source distance
+#define MEAN 0.0	/// source angle mean
 #define SIGMA 1.0   /// source angle std dev in radians
 #define E0 10.0     /// initial primary ray energy
 #define A 1.0       /// primary ray interaction probability scaling
@@ -13,6 +15,10 @@
  /// make global definitions file??
  // I'm treating this as a global definitions file
 
+ // Label the pixel edges
+enum class PIXEL_EDGE {TOP, BOTTOM, LEFT, RIGHT};
+
+
 /* Conditional print macros for debugging */
 #define DEBUG(debugCode, action) {\
 	if (CUR_DEBUG == (debugCode)  || CUR_DEBUG == DEBUG_ALL){\
@@ -21,10 +27,16 @@
 }
 
 
+
+
 /* Debug codes */
-#define CUR_DEBUG DEBUG_ALL
+#define CUR_DEBUG DB_INITPRIM
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0
 #define DB_ARGPASS 1
 #define DB_SIMCONST 2
+#define DB_INITPRIM 3
+#define DB_TRACE 4
+
+#endif

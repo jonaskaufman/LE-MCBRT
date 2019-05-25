@@ -1,23 +1,15 @@
+#ifndef SIMULATION_H
+#define SIMULATION_H
 
 
-#ifndef PARAMETERS_H
-#define PARAMETERS_H
 #include "parameters.hpp"
-#endif
-
-#ifndef RAY_H
-#define RAY_H
-//#include "ray.hpp"
-#endif
+#include "ray.hpp"
 
 #include <vector>
 #include <random>
-
-#ifndef _IOSTREAM_H
-#define _IOSTREAM
 #include <iostream>
-#endif
-
+#include <cmath>
+#include <utility>
 
 
 class SimulationSerial
@@ -25,12 +17,8 @@ class SimulationSerial
     public: 
     // SimulationSerial() = delete;
     
-    SimulationSerial(const int N, const double density); /// will this work? for static arrays?
+    SimulationSerial(const int N, const double density, const int ray_count); /// will this work? for static arrays?
 
-    
-
-    /// Label the pixel edges
-    enum class PIXEL_EDGE {TOP, BOTTOM, LEFT, RIGHT};
 
     /// Initalize densities
     void initialize_densities_random();
@@ -45,12 +33,17 @@ class SimulationSerial
     // Print data
     void print_m_densities();
     void print_m_doses();
+
+    std::default_random_engine random_engine {0};  // seeded random number generator 
+    std::uniform_real_distribution<double> uniform_dist {0.0, 1.0}; // uniform distribution, pass {lowerbound, upperbound}
+    std::normal_distribution<double> normal_dist {MEAN, SIGMA}; // normal distribribution, pass {mean, stddev}
     
     private:
     const int N;
-    double** m_densities;         /// pixel density values
-    double** m_doses;                   /// pixel dose values
-    //std::vector<Ray::Ray> m_rays;                /// active rays
+    std::vector< std::vector<double>> m_densities;      /// pixel density values
+    std::vector< std::vector<double>> m_doses;                   /// pixel dose values
+    //Ray test;
+    std::vector<Ray> m_rays;                /// active rays
 
     /// Randomly sample source angle for primary rays
     double _random_source_angle();
@@ -69,3 +62,4 @@ class SimulationSerial
 };
 
 
+#endif
