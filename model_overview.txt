@@ -12,11 +12,15 @@ Let the effective path length l_ep be the distance travelled within a given pixe
 For each pixel that is traversed, an interaction point may be generated with probability exp(-a/l_ep) where a is some constant.
 
 If an interaction point is generated, the primary ray is consumed and deposits some fraction f*l_ep of its energy to the current pixel.
+    (Both the probability of an interaction point being generated the energy and the energy deposited are functions of the pixel density.
+    Since the Ray class does not have information about the pixel density, but Simulation class knows the density, length traveled, and
+    which pixel was traced, it can create the interaction point, spawn secondary rays, and deposit energy)
 The remaining (1-f*l_ep) of the primary ray's energy is distributed equally to k_s secondary rays, whose angles are drawn randomly from a uniform distribution.
 For simplicity, the secondary rays originate from the center of the pixel at which the interaction occured.
 
 Secondary rays are traced pixel by pixel. For each pixel visited, the ray deposits energy g*l_ep or all of its energy, whichever is smaller. (is g necessary? could just scale E_0)
 Secondary rays are removed when they have zero energy.
+    (If we deposit a fraction of its current energy, it'll take forever to die. I'm going to try a fraction of E_0 / k_s)
 
 If any ray exits the grid, it is simply removed (no reflections). 
 

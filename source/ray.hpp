@@ -8,6 +8,7 @@
 #include <iostream>
 #include <tuple>
 #include <math.h>
+#include <string>
 
 typedef std::pair<int, int> PIXEL;
 
@@ -15,7 +16,8 @@ class Ray
 {
     public:
     
-    Ray();
+    Ray() = delete;
+    ~Ray();
 
     /// Constructor
     Ray(const bool primary, const double angle, PIXEL current_pixel, \
@@ -26,7 +28,23 @@ class Ray
     ///     - energy deposited to that pixel
     ///     - new rays generated
     std::tuple<PIXEL, double, std::vector<Ray>> evolve();
+
+    /// Trace ray through current pixel and return:
+    ///     - distance travelled in pixel
+    ///     - i,j for next pixel
+    std::pair<double, PIXEL> _trace(); 
+
+    void deactivate();
+    bool is_active();
+    PIXEL get_current_pixel();
+    double get_current_energy();
+    void set_current_energy(double new_energy);
+    bool is_primary();
+    PIXEL_EDGE get_current_edge();
+    double get_current_edge_dist();
+
     const double m_angle;
+
     private:
     bool m_active;                          /// whether ray is active
     const bool m_primary;                   /// whether ray is primary
@@ -37,18 +55,10 @@ class Ray
                                                 // becomes inactive when dist is out of bounds
     double m_current_energy;                        // energy remaining, becomes inactive when 0
 
-    /// Determine whether primary ray interacts at current pixel
-    bool _random_interact();
+    PIXEL _update_ray(int delta_x, int delta_y, double a, double b);
+    std::string _get_edge_name(PIXEL_EDGE edge); // gets string name of edge
     
-    /// Trace ray through current pixel and return:
-    ///     - distance travelled in pixel
-    ///     - i,j for next pixel
-    std::pair<double, PIXEL> _trace(); 
-    std::pair<double, PIXEL> _tb_trace();
-    std::pair<double, PIXEL> _lr_trace();
-
-    /// Generate secondary rays from primary ray
-    std::vector<Ray> _spawn_secondary_rays();
+    
 
 };
 

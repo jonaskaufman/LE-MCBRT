@@ -27,8 +27,8 @@ SimulationSerial::SimulationSerial(const int N, const double density, const int 
    }
    DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), ray_count));
    
-
-   _evolve_rays();
+   _evolve_to_completion();
+   //_evolve_rays(); // test one step of evolution
 }
 
 void SimulationSerial::initialize_densities_constant(const double density)
@@ -55,19 +55,20 @@ void SimulationSerial::initialize_densities_random()
    }
 }
 
-double SimulationSerial::_random_source_angle(){
-   return normal_dist(random_engine);
+double SimulationSerial::_random_source_angle(bool normal){
+   if (normal){ // normal
+      return normal_dist(random_engine);
+   }
+   else{ // uniform between 0 and 2 pi
+      return uniform_angle_dist(random_engine);
+   }
 }
 
 
 void SimulationSerial::_spawn_primary_ray(){
-   double source_angle = _random_source_angle(); // random source angle (normal dist)
-   while (source_angle < 0){
-      source_angle += 2 * M_PI;
-   }
-   while (source_angle >= 2 * M_PI){
-      source_angle -= 2 * M_PI;
-   }
+   double source_angle = _random_source_angle(true); // random source angle (normal dist)
+   source_angle = _normalize_angle(source_angle);
+
    DEBUG(DB_INITPRIM, printf("Angle: %.2f\t", source_angle));
 
    double horiz_dist = D * tan(source_angle); // horizontal distance from center of top edge
@@ -93,27 +94,118 @@ void SimulationSerial::_spawn_primary_ray(){
 }
 
 void SimulationSerial::_evolve_to_completion(){
-   while (m_rays.size() > 0){
-      _evolve_rays();
+   int rays_evolved = m_rays.size();
+   while (rays_evolved > 0){
+      rays_evolved = _evolve_rays();
+      DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
+      DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(1000)));
    }
 }
 
-void SimulationSerial::_evolve_rays(){
-   int debug_counter = 0;
-   for (Ray r: m_rays){
-      std::tuple<PIXEL, double, std::vector<Ray>> r_tuple = r.evolve();
-      PIXEL visited_pixel = std::get<0>(r_tuple);
-      int visited_x = visited_pixel.first;
-      int visited_y = visited_pixel.second;
-      double distance_traveled = std::get<1>(r_tuple);
-      std::vector<Ray> new_rays = std::get<2>(r_tuple);
+int SimulationSerial::_evolve_rays(){
+   std::vector<int> to_remove;
+   int rays_evolved = 0;
+   for (int i = 0; i < m_rays.size(); i++){
+      Ray *r = &m_rays[i];
+      
+      if (r->is_active() == false){
+         DEBUG(DB_SECONDARY, printf("ray %d is not active\n", i));
+         continue;
+      }
+      DEBUG(DB_SECONDARY, printf("ray %d is active\n", i));
+      rays_evolved++;
 
+      std::pair<double, PIXEL> r_trace = r->_trace();
+      double distance_traveled = r_trace.first;
+      PIXEL visited_pixel = r_trace.second;
+      PIXEL current_pixel = r->get_current_pixel();
+
+      std::vector<Ray> new_rays;
+
+      if (r->is_primary() == false){ // secondary rays deposit energy
+         _deposit_energy(r, visited_pixel, distance_traveled);
+         DEBUG(DB_SECONDARY, printf("Remaining energy: %.2f\n", r->get_current_energy()));
+      }
+      else if (_random_interact(r, visited_pixel, distance_traveled)){ // primary rays check for interaction
+         //to_remove.push_back(i);
+         //m_rays.erase(m_rays.begin() + i);
+         
+         DEBUG(DB_TRACE, printf("Deactivated vector %d because of interaction\n", i));
+         new_rays = _spawn_secondary_rays(r);
+         r->deactivate(); // deactivate primary ray
+         
+      }
+      
+      if (current_pixel.first < 0 || current_pixel.first >= N || \
+          current_pixel.second < 0 || current_pixel.second >= N){
+         r->deactivate();
+         DEBUG(DB_TRACE, printf("Deactivated vector %d because out-of-bounds\n", i));
+      }
+
+      
+      
       DEBUG(DB_TRACE, printf("Ray %d finished. Visited pixel %d, %d. Distance traveled is %.2f. Generated %lu secondary rays\n\n", \
-         debug_counter++, visited_pixel.first, visited_pixel.second, distance_traveled, new_rays.size()));
-      //r.evolve();
+         i, visited_pixel.first, visited_pixel.second, distance_traveled, new_rays.size()));
+
+      //DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(1000)));
+      
    }
+   //DEBUG(DB_TRACE, printf("%lu vectors remaining\n", m_rays.size()));
+   return rays_evolved;
+   /*
+   for (int i = 0; i < to_remove.size(); i++){
+      int remove = to_remove[i] - i;
+      m_rays.erase(m_rays.begin() + remove);
+   }*/
 }
 
+
+/* Determine whether primary ray interacts at current pixel
+   If it does, deposit fraction of energy there
+   */
+bool SimulationSerial::_random_interact(Ray *r, PIXEL visited, double distance){
+   int i = visited.first, j = visited.second;
+   double density = m_densities[i][j];
+   double l_ep = density * distance;
+   double probability = std::exp(-A / l_ep);
+   double rand = uniform_dist(random_engine);
+
+   bool result = rand < probability;
+   std::string result_string = result ? "TRUE" : "FALSE";
+
+   DEBUG(DB_INTERACT, printf("l_ep: %.2f\tprobability: %.2f\trand: %.2f\t", l_ep, probability, rand));
+   DEBUG(DB_INTERACT, std::cout << "interact? " << result_string << std::endl);
+
+   if (result){
+      double energy_deposited = F * l_ep * r->get_current_energy();
+      m_doses[i][j] += energy_deposited;
+      r->set_current_energy(r->get_current_energy() - energy_deposited);
+      DEBUG(DB_INTERACT, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
+   }
+   
+   return result;
+}
+
+/// Generate secondary rays from primary ray
+std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
+   std::vector<Ray> result;
+   
+
+   PIXEL current_pixel = primary->get_current_pixel();
+   PIXEL_EDGE current_edge = primary->get_current_edge();
+   double energy_remaining = primary->get_current_energy();
+   double partial_energy = energy_remaining / KS;
+   double current_edge_dist = primary->get_current_edge_dist();
+
+   for (int i = 0; i < KS; i++){
+      double source_angle = _random_source_angle(false); // random source angle (normal dist)
+      Ray secondary_ray = Ray(false, source_angle, current_pixel, current_edge, current_edge_dist, partial_energy);
+      result.push_back(secondary_ray);
+      m_rays.push_back(secondary_ray);
+   }
+   DEBUG(DB_SECONDARY, printf("spawned %d secondary rays\n", KS));
+   return result;
+}
 
 void SimulationSerial::print_m_densities(){
    std::cout << "m_densities: " << std::endl;
@@ -133,4 +225,36 @@ void SimulationSerial::print_m_doses(){
       }
       std::cout << std::endl;
    }
+}
+
+double SimulationSerial::_normalize_angle(double angle){
+   while (angle < 0){
+      angle += 2 * M_PI;
+   }
+   while (angle >= 2 * M_PI){
+      angle -= 2 * M_PI;
+   }
+   return angle;
+}
+
+/* Secondary rays deposit energy into the pixel they visited
+   Rethink this????
+   
+   Currently, each secondary ray has initial energy of E0 / KS.
+   So deposit random fraction of this initial energy
+*/
+void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
+   int i = visited.first, j = visited.second;
+   double density = m_densities[i][j];
+   double l_ep = density * distance;
+   double initial_energy = E0 / KS;
+   double current_energy = r->get_current_energy();
+   double energy_deposited = std::min(G * l_ep * E0 / KS, current_energy);
+   m_doses[i][j] += energy_deposited;
+   r->set_current_energy(current_energy - energy_deposited);
+   if (r->get_current_energy() < MIN_ENERGY){
+      r->deactivate();
+      DEBUG(DB_SECONDARY, printf("secondary ray ran out of energy.\n"));
+   }
+   DEBUG(DB_SECONDARY, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
 }
