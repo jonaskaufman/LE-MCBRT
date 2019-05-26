@@ -17,7 +17,16 @@ Ray::Ray(const bool primary, const double angle, std::pair<int, int> current_pix
 }
 
 std::tuple<PIXEL, double, std::vector<Ray>> Ray::evolve(){
+    std::pair<double, PIXEL> trace = _trace();
+    double distance_traveled = trace.first;
+    PIXEL next_pixel = trace.second;
+    DEBUG(DB_TRACE, printf("Going from %d, %d to %d, %d\n", \
+        m_current_pixel.first, m_current_pixel.second, next_pixel.first, next_pixel.second)); 
+    std::tuple<PIXEL, double, std::vector<Ray>> result;
 
+    std::vector<Ray> new_rays;
+    result = std::make_tuple(next_pixel, distance_traveled, new_rays);
+    return result;
 }
 
 
@@ -42,7 +51,7 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
     double pixel_x = m_current_edge_dist - m_current_pixel.first;
     double pixel_y = m_current_pixel.second;
     DEBUG(DB_TRACE, printf("pixel x,y: %.2f, %.2f\n", pixel_x, pixel_y));
-
+    
     if (m_angle < M_PI / 2){ // going SW
         // hits left wall
         DEBUG(DB_TRACE, printf("moving SW. Angle: %.2f\n", m_angle * 180 / M_PI))
@@ -50,14 +59,14 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
         double a1 = pixel_x;
         double b1 = a1 * tan(alpha1);
         double c1 = sqrt(a1 * a1 + b1 * b1);
-        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f", a1, b1, c1));
+        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f\n", a1, b1, c1));
 
         // hits bottom wall
         double alpha2 = m_angle;
         double b2 = 1;
         double a2 = b2 * tan(alpha2);
         double c2 = sqrt(a2 * a2 + b2 * b2);
-        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f", a2, b2, c2));
+        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f\n", a2, b2, c2));
 
         if (c1 < c2){ // hits left wall
             PIXEL next_pixel(m_current_pixel.first - 1, m_current_pixel.second);
@@ -77,14 +86,14 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
         double a1 = pixel_x;
         double b1 = a1 * tan(alpha1);
         double c1 = sqrt(a1 * a1 + b1 * b1);
-        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f", a1, b1, c1));
+        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f\n", a1, b1, c1));
 
         // hits top wall
         double alpha2 = M_PI - m_angle;
         double b2 = 1;
         double a2 = b2 * tan(alpha2);
         double c2 = sqrt(a2 * a2 + b2 * b2);
-        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f", a2, b2, c2));
+        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f\n", a2, b2, c2));
 
         if (c1 < c2){ // hits left wall
             PIXEL next_pixel(m_current_pixel.first - 1, m_current_pixel.second);
@@ -104,14 +113,14 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
         double a1 = pixel_x;
         double b1 = a1 * tan(alpha1);
         double c1 = sqrt(a1 * a1 + b1 * b1);
-        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f", a1, b1, c1));
+        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f\n", a1, b1, c1));
 
         // hits top wall
         double alpha2 = m_angle - M_PI;
         double b2 = 1;
         double a2 = b2 * tan(alpha2);
         double c2 = sqrt(a2 * a2 + b2 * b2);
-        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f", a2, b2, c2));
+        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f\n", a2, b2, c2));
 
         if (c1 < c2){ // hits right wall
             PIXEL next_pixel(m_current_pixel.first + 1, m_current_pixel.second);
@@ -131,14 +140,14 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
         double a1 = pixel_x;
         double b1 = a1 * tan(alpha1);
         double c1 = sqrt(a1 * a1 + b1 * b1);
-        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f", a1, b1, c1));
+        DEBUG(DB_TRACE, printf("a1, b1, c1: %.2f, %.2f, %.2f\n", a1, b1, c1));
 
         // hits bottom wall
         double alpha2 = 2 * M_PI - m_angle;
         double b2 = 1;
         double a2 = b2 * tan(alpha2);
         double c2 = sqrt(a2 * a2 + b2 * b2);
-        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f", a2, b2, c2));
+        DEBUG(DB_TRACE, printf("a2, b2, c2: %.2f, %.2f, %.2f\n", a2, b2, c2));
 
         if (c1 < c2){ // hits right wall
             PIXEL next_pixel(m_current_pixel.first + 1, m_current_pixel.second);
@@ -152,7 +161,7 @@ std::pair<double, PIXEL> Ray::_tb_trace(){
         }
     }
     else{
-        std::cout << "unexpected angle to trace";
+        std::cout << "unexpected angle to trace" << std::endl;
     }
 }
 

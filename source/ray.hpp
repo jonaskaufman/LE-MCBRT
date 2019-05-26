@@ -10,8 +10,6 @@
 #include <math.h>
 
 typedef std::pair<int, int> PIXEL;
-typedef std::pair<double, double> POS;
-
 
 class Ray
 {

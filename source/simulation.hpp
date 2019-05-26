@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <utility>
+#include <tuple>
 
 
 class SimulationSerial

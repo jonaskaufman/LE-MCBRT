@@ -30,7 +30,7 @@ enum class PIXEL_EDGE {TOP, BOTTOM, LEFT, RIGHT};
 
 
 /* Debug codes */
-#define CUR_DEBUG DB_INITPRIM
+#define CUR_DEBUG DB_TRACE
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0

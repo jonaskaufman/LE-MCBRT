@@ -28,7 +28,7 @@ SimulationSerial::SimulationSerial(const int N, const double density, const int 
    DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), ray_count));
    
 
-   //_evolve_rays();
+   _evolve_rays();
 }
 
 void SimulationSerial::initialize_densities_constant(const double density)
@@ -99,8 +99,17 @@ void SimulationSerial::_evolve_to_completion(){
 }
 
 void SimulationSerial::_evolve_rays(){
+   int debug_counter = 0;
    for (Ray r: m_rays){
       std::tuple<PIXEL, double, std::vector<Ray>> r_tuple = r.evolve();
+      PIXEL visited_pixel = std::get<0>(r_tuple);
+      int visited_x = visited_pixel.first;
+      int visited_y = visited_pixel.second;
+      double distance_traveled = std::get<1>(r_tuple);
+      std::vector<Ray> new_rays = std::get<2>(r_tuple);
+
+      DEBUG(DB_TRACE, printf("Ray %d finished. Visited pixel %d, %d. Distance traveled is %.2f. Generated %lu secondary rays\n\n", \
+         debug_counter++, visited_pixel.first, visited_pixel.second, distance_traveled, new_rays.size()));
       //r.evolve();
    }
 }
