@@ -3,6 +3,7 @@ Each pixel has a density value (between 0 and 1) and an absorbed dose value.
 The densities may be initialized randomly or otherwise. The doses are initialized to zero.
 
 Primary rays are spawned from a source point some distance d from the center of the top of the grid.
+    This means that a source angle of 0 radians is aimed South. All source angles are normalized to be between 0 and 2 pi.
 Primary rays have constant initial energy E_0.
 The spawn angle theta of each ray (relative to the vertical) is drawn randomly from a Gaussian distribution with standard deviation sigma.
 
