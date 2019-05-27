@@ -46,6 +46,8 @@ int main(int argc, char **argv)
     // run a given number of rays
     
     // write result
+    s.write_to_file();
+    
 
     return 0;
 }

@@ -42,6 +42,7 @@ class Ray
     bool is_primary();
     PIXEL_EDGE get_current_edge();
     double get_current_edge_dist();
+    void set_corrected();
 
     const double m_angle;
 
@@ -54,6 +55,9 @@ class Ray
     double m_current_edge_dist;             /// current distance along edge (from TOP or LEFT), 
                                                 // becomes inactive when dist is out of bounds
     double m_current_energy;                        // energy remaining, becomes inactive when 0
+
+    bool m_corrected = true;
+
 
     PIXEL _update_ray(int delta_x, int delta_y, double a, double b);
     std::string _get_edge_name(PIXEL_EDGE edge); // gets string name of edge

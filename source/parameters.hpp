@@ -14,7 +14,7 @@
 							// useful to avoid comparing to 0 which can cause error
 
 /// Global definitions (maybe make these constructor arguments?)
-#define PI 3.14159265358979323846 /// use standard def?
+//#define PI 3.14159265358979323846 /// use standard def?
  /// make global definitions file??
  // I'm treating this as a global definitions file
 
@@ -37,11 +37,11 @@ enum class PIXEL_EDGE {TOP, BOTTOM, LEFT, RIGHT};
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0
-#define DB_ARGPASS 1
-#define DB_SIMCONST 2
-#define DB_INITPRIM 3
-#define DB_TRACE 4
-#define DB_INTERACT 5
-#define DB_SECONDARY 6
+#define DB_ARGPASS 1 // passing arguments to run_serial
+#define DB_SIMCONST 2 // building the simulation
+#define DB_INITPRIM 3 // initializing primary rays
+#define DB_TRACE 4    // tracing ray from pixel to pixel
+#define DB_INTERACT 5  // probabilitisticly determining an interaction point
+#define DB_SECONDARY 6 // spawn and evolve secondary rays to completion
 
 #endif

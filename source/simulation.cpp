@@ -93,15 +93,22 @@ void SimulationSerial::_spawn_primary_ray(){
    
 }
 
+/* Continue to evolve rays as long as there are rays to evolve.
+   Couldn't get vector to delete the rays so rays are deactivated instead.
+   If a ray is deactivated, for loop goes to next ray
+   For loop returns number of rays it evolved.
+*/
 void SimulationSerial::_evolve_to_completion(){
    int rays_evolved = m_rays.size();
    while (rays_evolved > 0){
       rays_evolved = _evolve_rays();
       DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
-      DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(1000)));
+      //DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(100)));
    }
 }
-
+/* Evolve all active rays.
+   Return number of rays evolved
+*/
 int SimulationSerial::_evolve_rays(){
    std::vector<int> to_remove;
    int rays_evolved = 0;
@@ -113,6 +120,13 @@ int SimulationSerial::_evolve_rays(){
          continue;
       }
       DEBUG(DB_SECONDARY, printf("ray %d is active\n", i));
+      if (r->is_primary() == true){
+         DEBUG(DB_SECONDARY, printf("ray %d is primary\n", i));
+      }
+      else{
+         DEBUG(DB_SECONDARY, printf("ray %d is secondary\n", i));
+      }
+
       rays_evolved++;
 
       std::pair<double, PIXEL> r_trace = r->_trace();
@@ -132,13 +146,13 @@ int SimulationSerial::_evolve_rays(){
          
          DEBUG(DB_TRACE, printf("Deactivated vector %d because of interaction\n", i));
          new_rays = _spawn_secondary_rays(r);
-         r->deactivate(); // deactivate primary ray
+         m_rays[i].deactivate(); // deactivate primary ray. Not sure why r->deactivate wouldn't work
          
       }
       
       if (current_pixel.first < 0 || current_pixel.first >= N || \
           current_pixel.second < 0 || current_pixel.second >= N){
-         r->deactivate();
+         m_rays[i].deactivate();
          DEBUG(DB_TRACE, printf("Deactivated vector %d because out-of-bounds\n", i));
       }
 
@@ -198,11 +212,21 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    double current_edge_dist = primary->get_current_edge_dist();
 
    for (int i = 0; i < KS; i++){
-      double source_angle = _random_source_angle(false); // random source angle (normal dist)
-      Ray secondary_ray = Ray(false, source_angle, current_pixel, current_edge, current_edge_dist, partial_energy);
+      DEBUG(DB_SECONDARY, printf("Secondary %d:\n", i));
+      double source_angle = _random_source_angle(false); // random source angle (normal dist=false)
+      std::pair<int, int> adjustments = _fix_position(current_edge, primary->m_angle, source_angle);
+      
+      PIXEL adjusted_pixel(current_pixel.first + adjustments.first, current_pixel.second + adjustments.second);
+   
+      Ray secondary_ray = Ray(false, source_angle, adjusted_pixel, current_edge, current_edge_dist, partial_energy);
+      if (adjustments.first != 0 || adjustments.second != 0){
+         secondary_ray.set_corrected();
+      }
       result.push_back(secondary_ray);
       m_rays.push_back(secondary_ray);
    }
+
+
    DEBUG(DB_SECONDARY, printf("spawned %d secondary rays\n", KS));
    return result;
 }
@@ -257,4 +281,63 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
       DEBUG(DB_SECONDARY, printf("secondary ray ran out of energy.\n"));
    }
    DEBUG(DB_SECONDARY, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
+}
+
+/* Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary ray
+   Returns corrections to current pixel
+*/
+std::pair<int,int> SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
+   std::pair<int,int> result(0,0);
+   if (edge == PIXEL_EDGE::RIGHT){
+      if (current_angle > M_PI && new_angle < M_PI){
+         result.first = -1;
+         DEBUG(DB_SECONDARY, printf("Spawned secondary going left but primary was going right. Adjusting pixel location\n"));
+      }
+   }
+   else if (edge == PIXEL_EDGE::LEFT){
+      if (current_angle < M_PI && new_angle > M_PI){
+         result.first = 1;
+         DEBUG(DB_SECONDARY, printf("Spawned secondary going right but primary was going left. Adjusting pixel location\n"));
+      }
+   }
+   else if (edge == PIXEL_EDGE::TOP){
+      if ( (current_angle > M_PI / 2 && current_angle < 3 * M_PI / 2) && \
+           (new_angle < M_PI / 2 || new_angle > 3 * M_PI / 2) ){
+         result.second = 1;
+         DEBUG(DB_SECONDARY, printf("Spawned secondary going down but primary was going up. Adjusting pixel location\n"));
+      }
+   }
+   else{
+      if ( (current_angle < M_PI / 2 || current_angle > 3 * M_PI / 2) && \
+           (new_angle > M_PI / 2 && new_angle < 3 * M_PI / 2) ){
+         result.second = -1;
+         DEBUG(DB_SECONDARY, printf("Spawned secondary going up but primary was going down. Adjusting pixel location\n"));
+      }
+   }
+
+   return result;
+}
+
+void SimulationSerial::write_to_file(){
+   std::ofstream densities;
+   densities.open("densities.csv");
+   for (int i = 0; i < m_densities.size(); i++){
+      for (int j = 0; j < m_densities.size() - 1; j++){
+         densities << m_densities[i][j] << ",";
+      }
+      densities << m_densities[i][m_densities.size() - 1] << "\n";
+   }
+   densities.close();
+
+   std::ofstream doses;
+   doses.open("doses.csv");
+   for (int i = 0; i < m_doses.size(); i++){
+      for (int j = 0; j < m_doses.size() - 1; j++){
+         doses << m_doses[i][j] << ",";
+      }
+      densities << m_doses[i][m_doses.size() - 1] << "\n";
+   }
+   doses.close();
+
+
 }

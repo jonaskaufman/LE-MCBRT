@@ -8,11 +8,13 @@ Ray::Ray() : m_primary(false), m_angle(0.0){
 Ray::Ray(const bool primary, const double angle, std::pair<int, int> current_pixel, \
         PIXEL_EDGE current_edge, double current_edge_dist, double current_energy) : m_primary(primary), m_angle(angle)
 {
+
     m_active = true;
     m_current_pixel = current_pixel;
     m_current_edge = current_edge;
     m_current_edge_dist = current_edge_dist;
     m_current_energy = current_energy;
+    
     
 }
 /* Moves ray one pixel. 
@@ -57,12 +59,13 @@ std::pair<double, PIXEL> Ray::_trace()
 
     if (m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::BOTTOM){ // on top/bottom edge
         pixel_x = m_current_edge_dist - m_current_pixel.first;
-        pixel_y = m_current_pixel.second;
+        pixel_y = 0; //m_current_pixel.second;
     }
     else{                                                                            // on left/right edge
-        pixel_x = m_current_pixel.first;
+        pixel_x = 0; //m_current_pixel.first;
         pixel_y = m_current_edge_dist - m_current_pixel.second;
     }
+    
     
     DEBUG(DB_TRACE, printf("pixel x,y: %.2f, %.2f\n", pixel_x, pixel_y));
     double alpha1, alpha2;
@@ -91,6 +94,11 @@ std::pair<double, PIXEL> Ray::_trace()
         delta_x1 = -1; delta_y1 = 0;
         delta_x2 = 0; delta_y2 = -1;
 
+        if (m_current_edge == PIXEL_EDGE::BOTTOM){ // special case. Primary ray interacted at bottom edge (meaning pixel j increased by 1) 
+                                                    // but angle moves up but hits left/right wall. But moved enough to move back so j--
+            delta_y1 = -1;
+        }
+
         if (m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::BOTTOM){ // on top/bottom edge
             a1 = pixel_x;
             b2 = 1;
@@ -107,6 +115,10 @@ std::pair<double, PIXEL> Ray::_trace()
         delta_x1 = 1; delta_y1 = 0;
         delta_x2 = 0; delta_y2 = -1;
 
+        if (m_current_edge == PIXEL_EDGE::BOTTOM){
+            delta_y1 = -1;
+        }
+
         if (m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::BOTTOM){ // on top/bottom edge
             a1 = 1 - pixel_x;
             b2 = 1;
@@ -117,7 +129,7 @@ std::pair<double, PIXEL> Ray::_trace()
         }
 
     }
-    else if (m_angle < 2 * PI){ // going SE
+    else if (m_angle < 2 * M_PI){ // going SE
         DEBUG(DB_TRACE, printf("moving SE. Angle: %.2f\n", m_angle * 180 / M_PI))
         alpha1 = m_angle - 3 * M_PI / 2; // hits right wall
         alpha2 = 2 * M_PI - m_angle; // hits bottom wall
@@ -159,6 +171,15 @@ std::pair<double, PIXEL> Ray::_trace()
         old_pixel = _update_ray(delta_x2, delta_y2, a2, b2);
     }
 
+    if (pixel_x < 0 || pixel_y < 0){
+        printf("error. pixel x and y should be non-negative\n");
+        exit(1);
+    }
+    if (pixel_x > 1 || pixel_y > 1){
+        printf("error. pixel x and y should be smaller than 1\n");
+        exit(1);
+    }
+
     std::pair<double, PIXEL> result(dist_traveled, old_pixel);
     return result;
 }
@@ -167,7 +188,8 @@ std::pair<double, PIXEL> Ray::_trace()
    and current edge distance. Returns pixel it traversed
 
    Here, delta_x and delta_y describe pixel offset. So (-1, 0) implies movement to the left neighbor pixel
-   a, b are legs of the triangle desribing the rays movement. So (-0.3, 0.4) implies the ray moved 0.3 units left and 0.4 down.
+   a, b are legs of the triangle describing the rays movement. So (0.3, 0.4) implies the ray moved 0.3 horizontal units and 0.4 vertical units
+   a, b are always positive
 */
 PIXEL Ray::_update_ray(int delta_x, int delta_y, double a, double b){
     // get next pixel
@@ -176,19 +198,29 @@ PIXEL Ray::_update_ray(int delta_x, int delta_y, double a, double b){
 
     PIXEL old_pixel(m_current_pixel.first, m_current_pixel.second);
     PIXEL next_pixel(next_x, next_y);
-    DEBUG(DB_TRACE, printf("Going from %d, %d to %d, %d\n", \
-        m_current_pixel.first, m_current_pixel.second, next_pixel.first, next_pixel.second)); 
+    
     
     std::string old_edge = _get_edge_name(m_current_edge);
     DEBUG(DB_TRACE, printf("old edge distance: %.2f\n", m_current_edge_dist));
     // update edge
     if (delta_x != 0){                      // moving horizontally to left/right edge
-        if (m_current_edge == PIXEL_EDGE::TOP){
-            m_current_edge_dist = m_current_pixel.second + b;
+        if (m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::BOTTOM){
+
+            if (m_angle > M_PI / 2 && m_angle < 3 * M_PI / 2 ){ // going up
+                m_current_edge_dist = m_current_pixel.second - b;
+                if (m_current_edge_dist < next_pixel.second){
+                    m_current_edge_dist += 1;
+                }
+                /*
+                if (m_current_pixel.second == 0){ // don't go negative for the 0th row. Just fractional
+                    m_current_edge_dist += 1;
+                }
+                */
+            }
+            else{                                               // going down
+               m_current_edge_dist = m_current_pixel.second + b;
+            } 
             
-        }
-        else if (m_current_edge == PIXEL_EDGE::BOTTOM){
-            m_current_edge_dist = m_current_pixel.second - b;
         }
    
         else{      // already on left/right, ending up on left/right (with some up/down displacement)                                              
@@ -210,11 +242,24 @@ PIXEL Ray::_update_ray(int delta_x, int delta_y, double a, double b){
         }
     }
     else{                                   // moving vertically
-        if (m_current_edge == PIXEL_EDGE::LEFT){
-            m_current_edge_dist = m_current_pixel.first + a;
-        }
-        else if (m_current_edge == PIXEL_EDGE::RIGHT){
-            m_current_edge_dist = m_current_pixel.second - a;
+        if (m_current_edge == PIXEL_EDGE::LEFT || m_current_edge == PIXEL_EDGE::RIGHT){
+            if (m_angle < M_PI ){                               // going left
+                m_current_edge_dist = m_current_pixel.first - a;
+                
+                if (m_corrected == false && m_primary == false && m_current_edge_dist < next_x){   // correct for secondary ray going opposite primary
+                    m_current_edge_dist += 1;
+                    DEBUG(DB_TRACE, printf("adjusted current edge distance by +1\n"));
+                    
+                }
+                
+                
+            }
+            else{                                               // going right
+               m_current_edge_dist = m_current_pixel.first + a;
+            } 
+            
+        
+            
         }
    
         else{       // already on top/bottom, ending up on top/bottom (with some left/right displacement)                                             
@@ -229,16 +274,50 @@ PIXEL Ray::_update_ray(int delta_x, int delta_y, double a, double b){
         }
         
         if (delta_y == 1){
+            if (m_current_edge == PIXEL_EDGE::LEFT && m_angle < M_PI && m_corrected == true){
+                m_current_edge_dist += 1;       // special case where the formula gives incorrect result b/c pixel is same
+                DEBUG(DB_TRACE, printf("special case, increased current edge distance by 1\n"));
+            }
             m_current_edge = PIXEL_EDGE::BOTTOM; // set bottom edge
         }
         else{
+            
+            if (m_current_edge == PIXEL_EDGE::LEFT && m_angle < M_PI && m_corrected == true){
+                m_current_edge_dist += 1;       // special case where the formula gives incorrect result b/c pixel is same
+                DEBUG(DB_TRACE, printf("special case, increased current edge distance by 1\n"));
+            }
+            
             m_current_edge = PIXEL_EDGE::TOP; // set top edge
+        }
+
+        if (m_corrected == false){
+            m_corrected = true;
         }
     }
     std::string new_edge = _get_edge_name(m_current_edge);
     DEBUG(DB_TRACE, std::cout << "went from " << old_edge << " edge to " << new_edge << " edge" << std::endl);
     DEBUG(DB_TRACE, printf("new edge distance is %.2f\n", m_current_edge_dist));
     
+    // special case where secondary is traveleing opposite direction to primary causes this
+    // also triggered when out of bounds but ray is going to be removed so next_pixel doesn't matter
+    /*
+    if (m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::BOTTOM){
+        if (m_current_edge_dist < next_x){
+            next_pixel.first -= 1;
+            DEBUG(DB_TRACE, printf("special case. Adjusting next pixel's x by -1\n"));
+        }
+    }
+    else{
+        if (m_current_edge_dist < next_y){
+            next_pixel.second -= 1;
+            DEBUG(DB_TRACE, printf("special case. Adjusting next pixel's y by -1\n"));
+        }
+    }
+    */
+    DEBUG(DB_TRACE, printf("Going from %d, %d to %d, %d\n", \
+        m_current_pixel.first, m_current_pixel.second, next_pixel.first, next_pixel.second)); 
+
+
     // update current pixel
     m_current_pixel = next_pixel;
 
@@ -294,4 +373,8 @@ PIXEL_EDGE Ray::get_current_edge(){
 
 double Ray::get_current_edge_dist(){
     return m_current_edge_dist;
+}
+
+void Ray::set_corrected(){
+    m_corrected = false;
 }

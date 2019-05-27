@@ -13,6 +13,7 @@
 #include <tuple>
 #include <chrono>
 #include <thread>
+#include <fstream>
 
 
 class SimulationSerial
@@ -40,6 +41,7 @@ class SimulationSerial
     std::uniform_real_distribution<double> uniform_dist {0.0, 1.0}; // uniform distribution, pass {lowerbound, upperbound}
     std::uniform_real_distribution<double> uniform_angle_dist {0.0, 2 * M_PI}; // uniform distributioin between 0 and 2 pi
     std::normal_distribution<double> normal_dist {MEAN, SIGMA}; // normal distribribution, pass {mean, stddev}
+    void write_to_file();
     
     private:
     const int N;
@@ -69,6 +71,9 @@ class SimulationSerial
     double _normalize_angle(double angle);
 
     void _deposit_energy(Ray *r, PIXEL visited, double distance);
+    std::pair<int,int> _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
+
+    
 };
 
 
