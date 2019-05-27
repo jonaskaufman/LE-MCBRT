@@ -103,7 +103,7 @@ void SimulationSerial::_evolve_to_completion(){
    while (rays_evolved > 0){
       rays_evolved = _evolve_rays();
       DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
-      //DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(100)));
+      DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(10)));
    }
 }
 /* Evolve all active rays.

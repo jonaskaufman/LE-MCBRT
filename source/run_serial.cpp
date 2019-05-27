@@ -36,9 +36,9 @@ int main(int argc, char **argv)
     // create simulation class
     SimulationSerial s = SimulationSerial(N, density, ray_count);
     DEBUG(DB_SIMCONST, std::cout << "created simulation" << std::endl);
-    DEBUG(DB_SIMCONST, s.print_m_densities());
-    DEBUG(DB_SIMCONST, std::cout << "******************" << std::endl);
-    DEBUG(DB_SIMCONST, s.print_m_doses());
+    //DEBUG(DB_SIMCONST, s.print_m_densities());
+    //DEBUG(DB_SIMCONST, std::cout << "******************" << std::endl);
+    //DEBUG(DB_SIMCONST, s.print_m_doses());
 
 
     // initialize grid

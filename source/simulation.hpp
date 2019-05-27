@@ -14,6 +14,8 @@
 #include <chrono>
 #include <thread>
 #include <fstream>
+#include <time.h>
+
 
 
 class SimulationSerial
@@ -37,7 +39,7 @@ class SimulationSerial
     void print_m_densities();
     void print_m_doses();
 
-    std::default_random_engine random_engine {0};  // seeded random number generator 
+    std::default_random_engine random_engine {(uint_fast32_t) time(0)};  // seeded random number generator 
     std::uniform_real_distribution<double> uniform_dist {0.0, 1.0}; // uniform distribution, pass {lowerbound, upperbound}
     std::uniform_real_distribution<double> uniform_angle_dist {0.0, 2 * M_PI}; // uniform distributioin between 0 and 2 pi
     std::normal_distribution<double> normal_dist {MEAN, SIGMA}; // normal distribribution, pass {mean, stddev}
