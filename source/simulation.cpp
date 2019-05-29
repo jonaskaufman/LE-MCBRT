@@ -1,40 +1,22 @@
 #include "simulation.hpp"
 
-SimulationSerial::SimulationSerial(const int N, const double density, const int ray_count) : N(N)
+SimulationSerial::SimulationSerial(const int N) : m_N(N)
 {
-
-   for (int i = 0; i < N; i++){
+   for (int i = 0; i < m_N; i++){
       std::vector<double> temp;
-      for (int j = 0; j < N; j++){
+      for (int j = 0; j < m_N; j++){
          temp.push_back(0);
       }
       m_densities.push_back(temp);
       m_doses.push_back(temp);
    }
-   
+}   
 
-   if (density == -1) {
-      DEBUG(DB_SIMCONST, std::cout << "density is -1" << std::endl);
-      initialize_densities_random();
-   }
-   else{
-      DEBUG(DB_SIMCONST, std::cout << "density is not -1" << std::endl);
-      initialize_densities_constant(density);
-   }
-   
-   for (int i = 0; i < ray_count; i++){
-      _spawn_primary_ray();
-   }
-   DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), ray_count));
-   
-   _evolve_to_completion();
-   //_evolve_rays(); // test one step of evolution
-}
 
 void SimulationSerial::initialize_densities_constant(const double density)
 {
-   for (int i = 0; i < N; i++){
-      for (int j = 0; j < N; j++){
+   for (int i = 0; i < m_N; i++){
+      for (int j = 0; j < m_N; j++){
          m_densities[i][j] = density;
       }
    }
@@ -47,12 +29,23 @@ void SimulationSerial::initialize_densities_random()
    std::mt19937 mt(rd());
    std::uniform_real_distribution<double> uni_dist(0.0, 1.0);
    */
-   for (int i = 0; i < N; i++){
-      for (int j = 0; j < N; j++){
+   for (int i = 0; i < m_N; i++){
+      for (int j = 0; j < m_N; j++){
          m_densities[i][j] = uniform_dist(random_engine);
          DEBUG(DB_SIMCONST, std::cout << "m_densities[" << i << "][" << j << "]: " << m_densities[i][j] << std::endl);
       }
    }
+}
+
+void SimulationSerial::run(int num_primary_rays)
+{
+    for (int i = 0; i < num_primary_rays; i++)
+    {
+        _spawn_primary_ray();
+    }
+    DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), num_primary_rays));
+    _evolve_to_completion();
+    return;
 }
 
 double SimulationSerial::_random_source_angle(bool normal){
@@ -74,11 +67,11 @@ void SimulationSerial::_spawn_primary_ray(){
    double horiz_dist = D * tan(source_angle); // horizontal distance from center of top edge
    DEBUG(DB_INITPRIM, printf("horiz_dist: %.2f\t", horiz_dist));
 
-   int middle_pixel = N / 2;
+   int middle_pixel = m_N / 2;
    
    double x_coord = middle_pixel + horiz_dist; // x coordinate on top edge that primary ray originates from
    
-   if (x_coord < 0 || x_coord >= N){ // primary ray missed the grid
+   if (x_coord < 0 || x_coord >= m_N){ // primary ray missed the grid
       DEBUG(DB_INITPRIM, printf("\n"));
       return;
    }
@@ -150,8 +143,8 @@ int SimulationSerial::_evolve_rays(){
          
       }
       
-      if (current_pixel.first < 0 || current_pixel.first >= N || \
-          current_pixel.second < 0 || current_pixel.second >= N){
+      if (current_pixel.first < 0 || current_pixel.first >= m_N || \
+          current_pixel.second < 0 || current_pixel.second >= m_N){
          m_rays[i].deactivate();
          DEBUG(DB_TRACE, printf("Deactivated vector %d because out-of-bounds\n", i));
       }
@@ -231,20 +224,20 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    return result;
 }
 
-void SimulationSerial::print_m_densities(){
+void SimulationSerial::print_densities(){
    std::cout << "m_densities: " << std::endl;
-   for (int i = 0; i < N; i++){
-      for (int j = 0; j < N; j++){
+   for (int i = 0; i < m_N; i++){
+      for (int j = 0; j < m_N; j++){
          printf("%.2f ", m_densities[i][j]);
       }
       std::cout << std::endl;
    }
 }
 
-void SimulationSerial::print_m_doses(){
+void SimulationSerial::print_doses(){
    std::cout << "m_doses: " << std::endl;
-   for (int i = 0; i < N; i++){
-      for (int j = 0; j < N; j++){
+   for (int i = 0; i < m_N; i++){
+      for (int j = 0; j < m_N; j++){
          printf("%.2f ", m_doses[i][j]);
       }
       std::cout << std::endl;
@@ -283,9 +276,6 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
    DEBUG(DB_SECONDARY, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
 }
 
-/* Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary ray
-   Returns corrections to current pixel
-*/
 std::pair<int,int> SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
    std::pair<int,int> result(0,0);
    if (edge == PIXEL_EDGE::RIGHT){

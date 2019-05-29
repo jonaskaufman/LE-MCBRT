@@ -34,20 +34,26 @@ int main(int argc, char **argv)
     DEBUG(DB_ARGPASS, std::cout << "about to create simulation" << std::endl);
 
     // create simulation class
-    SimulationSerial s = SimulationSerial(N, density, ray_count);
+    SimulationSerial s = SimulationSerial(N);
     DEBUG(DB_SIMCONST, std::cout << "created simulation" << std::endl);
-    //DEBUG(DB_SIMCONST, s.print_m_densities());
-    //DEBUG(DB_SIMCONST, std::cout << "******************" << std::endl);
-    //DEBUG(DB_SIMCONST, s.print_m_doses());
-
-
+   
     // initialize grid
+    if (density == -1)
+    {
+        DEBUG(DB_SIMCONST, std::cout << "density is -1" << std::endl);
+        s.initialize_densities_random();
+    }
+    else
+    {
+        DEBUG(DB_SIMCONST, std::cout << "density is not -1" << std::endl);
+        s.initialize_densities_constant(density);
+    }
     
     // run a given number of rays
-    
+    s.run(ray_count);
+       
     // write result
-    s.write_to_file();
-    
+    s.write_to_file(); 
 
     return 0;
 }

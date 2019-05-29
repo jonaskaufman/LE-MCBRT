@@ -1,7 +1,6 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-
 #include "parameters.hpp"
 #include "ray.hpp"
 
@@ -17,13 +16,11 @@
 #include <time.h>
 
 
-
 class SimulationSerial
 {
     public: 
     SimulationSerial() = delete;
-    SimulationSerial(const int N, const double density, const int ray_count); /// will this work? for static arrays?
-
+    SimulationSerial(const int N);
 
     /// Initalize densities
     void initialize_densities_random();
@@ -33,24 +30,24 @@ class SimulationSerial
     void run(int num_primary_rays);
 
     /// Get array of doses
-    double* get_doses();
+    /// std::vector< std::vector<double>> get_doses();
 
-    // Print data
-    void print_m_densities();
-    void print_m_doses();
+    /// Print data
+    void print_densities();
+    void print_doses();
+    void write_to_file();
 
+    /// Random distributions
     std::default_random_engine random_engine {(uint_fast32_t) time(0)};  // seeded random number generator 
     std::uniform_real_distribution<double> uniform_dist {0.0, 1.0}; // uniform distribution, pass {lowerbound, upperbound}
     std::uniform_real_distribution<double> uniform_angle_dist {0.0, 2 * M_PI}; // uniform distributioin between 0 and 2 pi
     std::normal_distribution<double> normal_dist {MEAN, SIGMA}; // normal distribribution, pass {mean, stddev}
-    void write_to_file();
     
     private:
-    const int N;
-    std::vector< std::vector<double>> m_densities;      /// pixel density values
-    std::vector< std::vector<double>> m_doses;                   /// pixel dose values
-    //Ray test;
-    std::vector<Ray> m_rays;                /// active rays
+    const int m_N;                                      /// number of pixels per side
+    std::vector< std::vector<double>> m_densities;      /// grid of density values
+    std::vector< std::vector<double>> m_doses;          /// grid of dose values
+    std::vector<Ray> m_rays;                            /// active rays
 
     /// Randomly sample source angle for primary rays
     double _random_source_angle(bool normal);
@@ -70,12 +67,16 @@ class SimulationSerial
     /// Generate secondary rays from primary ray
     std::vector<Ray> _spawn_secondary_rays(Ray *primary);
 
+    /// Enforce limits: 0 <= angle < 2*pi
     double _normalize_angle(double angle);
 
+    /// Deposit energy from ray to pixel visited 
     void _deposit_energy(Ray *r, PIXEL visited, double distance);
-    std::pair<int,int> _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
-
     
+    /// Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary ray
+    /// Returns corrections to current pixel
+    std::pair<int,int> _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
+ 
 };
 
 
