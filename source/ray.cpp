@@ -5,7 +5,7 @@ Ray::Ray() : m_primary(false), m_angle(0.0){
 }
 */
 
-Ray::Ray(const bool primary, const double angle, std::pair<int, int> current_pixel, \
+Ray::Ray(const bool primary, const double angle, PIXEL current_pixel, \
         PIXEL_EDGE current_edge, double current_edge_dist, double current_energy) : m_primary(primary), m_angle(angle)
 {
 
@@ -15,7 +15,56 @@ Ray::Ray(const bool primary, const double angle, std::pair<int, int> current_pix
     m_current_edge_dist = current_edge_dist;
     m_current_energy = current_energy;
     
+}
+
+Ray Ray::primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist)
+{
+    return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, E0);
+}
+
+
+Ray Ray::secondary_from_center(PIXEL spawn_pixel, double angle, double energy)
+{
+    PIXEL_EDGE new_edge;
+    int flip;
+    double offset;
+    int i_adjust = 0;
+    int j_adjust = 0;
+
+    if (angle > 7 * M_PI / 4 && angle < M_PI / 4)
+    {
+        new_edge = PIXEL_EDGE::TOP;  // bottom edge to top edge
+        flip = 1;
+        offset = 0;
+        j_adjust = -1;
+    }
+    else if (angle > M_PI / 4 && angle < 3 * M_PI / 4)
+    {
+        new_edge = PIXEL_EDGE::LEFT; // right edge to left edge
+        flip = -1;
+        offset = M_PI / 2;
+        i_adjust = 1;
+    }
+    else if (angle > 3 * M_PI / 4 &&  angle < 5 * M_PI / 4)
+    {
+        new_edge = PIXEL_EDGE::BOTTOM; // top edge to bottom edge
+        flip = -1;
+        offset = M_PI;
+        j_adjust = 1;
+    }
+    else //if (angle > 5 * M_PI / 4 && angle < 2 * M_PI)
+    {
+        new_edge = PIXEL_EDGE::RIGHT; // left edge to right edge
+        flip = 1;
+        offset = 3 * M_PI / 2;
+        i_adjust = -1;
+    }
     
+    PIXEL new_pixel (spawn_pixel.first + i_adjust, spawn_pixel.second + j_adjust);
+    double new_edge_dist = 0.5 + 2 * flip * tan(angle - offset);
+
+    // TODO need to check edges for out of bounds, could do in simulation class
+    return Ray(false, angle, new_pixel, new_edge, new_edge_dist, energy);
 }
 
 
@@ -321,6 +370,7 @@ PIXEL Ray::_update_ray(int delta_x, int delta_y, double a, double b){
     DEBUG(DB_TRACE, printf("Going from %d, %d to %d, %d\n", \
         m_current_pixel.first, m_current_pixel.second, next_pixel.first, next_pixel.second)); 
 
+    // Segfault 11 occurs after this print statement
 
     // update current pixel
     m_current_pixel = next_pixel;

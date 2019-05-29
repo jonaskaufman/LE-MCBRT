@@ -19,7 +19,10 @@ class Ray
     Ray() = delete;
     ~Ray();
     Ray(const bool primary, const double angle, PIXEL current_pixel, \
-        PIXEL_EDGE current_edge, double current_edge_dist, double current_energy);
+        PIXEL_EDGE current_edge, double current_edge_dist, double current_energy); //TODO make private
+
+    static Ray primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist);
+    static Ray secondary_from_center(PIXEL spawn_pixel, const double angle, double energy);
 
     /// Trace ray through current pixel and return:
     ///     - distance travelled in pixel
@@ -38,7 +41,7 @@ class Ray
     bool is_primary();
     PIXEL_EDGE get_current_edge();
     double get_current_edge_dist();
- 
+
     const double m_angle;                   /// angle of ray, ideally should be private
 
     private:

@@ -206,6 +206,8 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    for (int i = 0; i < KS; i++){
       DEBUG(DB_SECONDARY, printf("Secondary %d:\n", i));
       double source_angle = _random_source_angle(false); // random source angle (normal dist=false)
+      
+      
       std::pair<int, int> adjustments = _fix_position(current_edge, primary->m_angle, source_angle);
       
       // TODO: make adjust pixel function?
@@ -214,6 +216,9 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
       PIXEL adjusted_pixel(current_pixel.first + adjustments.first, current_pixel.second + adjustments.second);
    
       Ray secondary_ray = Ray(false, source_angle, adjusted_pixel, current_edge, current_edge_dist, partial_energy);
+      
+      // secondary_ray.fix_position()  
+      
       if (adjustments.first != 0 || adjustments.second != 0){
          secondary_ray.set_corrected();
       }
@@ -286,7 +291,7 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
 
 // JK read
 // confused by arguments here, I think they might be mixed up
-std::pair<int,int> SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
+PIXEL SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
    std::pair<int,int> result(0,0);
    if (edge == PIXEL_EDGE::RIGHT){
       if (current_angle > M_PI && new_angle < M_PI){

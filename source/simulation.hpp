@@ -77,8 +77,8 @@ class SimulationSerial
     
     /// Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary ray
     /// Returns corrections to current pixel
-    std::pair<int,int> _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
- 
+    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle); 
+
 };
 
 
