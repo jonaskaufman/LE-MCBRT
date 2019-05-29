@@ -17,13 +17,16 @@ Ray::Ray(const bool primary, const double angle, std::pair<int, int> current_pix
     
     
 }
-/* Moves ray one pixel. 
+
+
+/*
+ Moves ray one pixel. 
    Obsolete???????
    
 
-*/
+
 std::tuple<PIXEL, double, std::vector<Ray>> Ray::evolve(){
-    std::pair<double, PIXEL> trace = _trace();
+    std::pair<double, PIXEL> trace = trace();
     double distance_traveled = trace.first;
     PIXEL next_pixel = trace.second;
     
@@ -33,6 +36,7 @@ std::tuple<PIXEL, double, std::vector<Ray>> Ray::evolve(){
     result = std::make_tuple(next_pixel, distance_traveled, new_rays);
     return result;
 }
+*/
 
 /* Simulates a ray moving from one pixel to another.
     Returns distance traveled and pixel traveresed
@@ -45,7 +49,7 @@ std::tuple<PIXEL, double, std::vector<Ray>> Ray::evolve(){
    Then it will either cross the left edge, or the bottom edge. So both edges are considered,
    triangles leading to both are formed and solved. The one with shortest hyponetuse is correct.
 */
-std::pair<double, PIXEL> Ray::_trace()
+std::pair<double, PIXEL> Ray::trace()
 {
     
     double pixel_x, pixel_y; // horizontal and vertical displacement from a top-left edge of current pixel

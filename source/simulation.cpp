@@ -1,5 +1,6 @@
 #include "simulation.hpp"
 
+// JK read
 SimulationSerial::SimulationSerial(const int N) : m_N(N)
 {
    for (int i = 0; i < m_N; i++){
@@ -12,7 +13,7 @@ SimulationSerial::SimulationSerial(const int N) : m_N(N)
    }
 }   
 
-
+// JK read
 void SimulationSerial::initialize_densities_constant(const double density)
 {
    for (int i = 0; i < m_N; i++){
@@ -22,13 +23,9 @@ void SimulationSerial::initialize_densities_constant(const double density)
    }
 }
 
+// JK read
 void SimulationSerial::initialize_densities_random()
 {
-   /*
-   std::random_device rd;
-   std::mt19937 mt(rd());
-   std::uniform_real_distribution<double> uni_dist(0.0, 1.0);
-   */
    for (int i = 0; i < m_N; i++){
       for (int j = 0; j < m_N; j++){
          m_densities[i][j] = uniform_dist(random_engine);
@@ -37,17 +34,22 @@ void SimulationSerial::initialize_densities_random()
    }
 }
 
+// JK read
 void SimulationSerial::run(int num_primary_rays)
 {
+    // a thought: would it help with memory issues to spawn a certain number at a time, then evolve those?
+    // would require clearing the ray vector in _evolve_to_completion
     for (int i = 0; i < num_primary_rays; i++)
     {
         _spawn_primary_ray();
     }
-    DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), num_primary_rays));
     _evolve_to_completion();
+
+    DEBUG(DB_INITPRIM, printf("spawned %lu/%d primary rays\n", m_rays.size(), num_primary_rays));
     return;
 }
 
+// JK read
 double SimulationSerial::_random_source_angle(bool normal){
    if (normal){ // normal
       return normal_dist(random_engine);
@@ -57,10 +59,10 @@ double SimulationSerial::_random_source_angle(bool normal){
    }
 }
 
-
+// JK read
 void SimulationSerial::_spawn_primary_ray(){
    double source_angle = _random_source_angle(true); // random source angle (normal dist)
-   source_angle = _normalize_angle(source_angle);
+   source_angle = _normalize_angle(source_angle); // TODO: is this necessary? could put in _random_source_angle func
 
    DEBUG(DB_INITPRIM, printf("Angle: %.2f\t", source_angle));
 
@@ -78,14 +80,13 @@ void SimulationSerial::_spawn_primary_ray(){
    DEBUG(DB_INITPRIM, printf("x_coord: %.2f\n", x_coord));
 
    PIXEL current_pixel (floor(x_coord), 0); // current pixel rounds down x_coord and starts at top
-   
-   
 
-   Ray ray = Ray(true, source_angle, current_pixel, PIXEL_EDGE::TOP, x_coord, E0); // passing E0 energy but primary won't deposit it
+   Ray ray = Ray(true, source_angle, current_pixel, PIXEL_EDGE::TOP, x_coord, E0); //  passing E0 energy but primary won't deposit it TODO what?
    m_rays.push_back(ray);
    
 }
 
+// JK read
 /* Continue to evolve rays as long as there are rays to evolve.
    Couldn't get vector to delete the rays so rays are deactivated instead.
    If a ray is deactivated, for loop goes to next ray
@@ -98,12 +99,15 @@ void SimulationSerial::_evolve_to_completion(){
       DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
       DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(10)));
    }
+   // rays.clear()
 }
+
+// JK read
 /* Evolve all active rays.
    Return number of rays evolved
 */
 int SimulationSerial::_evolve_rays(){
-   std::vector<int> to_remove;
+   
    int rays_evolved = 0;
    for (int i = 0; i < m_rays.size(); i++){
       Ray *r = &m_rays[i];
@@ -122,33 +126,32 @@ int SimulationSerial::_evolve_rays(){
 
       rays_evolved++;
 
-      std::pair<double, PIXEL> r_trace = r->_trace();
-      double distance_traveled = r_trace.first;
-      PIXEL visited_pixel = r_trace.second;
-      PIXEL current_pixel = r->get_current_pixel();
+      /// trace ray
+      std::pair<double, PIXEL> rtrace = r->trace();
+      double distance_traveled = rtrace.first;
+      PIXEL visited_pixel = rtrace.second;  // pixel visited
+      PIXEL current_pixel = r->get_current_pixel(); // updated new pixel? what if it goes off the edge? TODO
 
-      std::vector<Ray> new_rays;
+      std::vector<Ray> new_rays; // TODO needed if primary?
 
       if (r->is_primary() == false){ // secondary rays deposit energy
          _deposit_energy(r, visited_pixel, distance_traveled);
          DEBUG(DB_SECONDARY, printf("Remaining energy: %.2f\n", r->get_current_energy()));
       }
-      else if (_random_interact(r, visited_pixel, distance_traveled)){ // primary rays check for interaction
-         //to_remove.push_back(i);
-         //m_rays.erase(m_rays.begin() + i);
+      else if (_random_interact(r, visited_pixel, distance_traveled)){ // primary rays check for interaction 
          
          DEBUG(DB_TRACE, printf("Deactivated vector %d because of interaction\n", i));
          new_rays = _spawn_secondary_rays(r);
-         m_rays[i].deactivate(); // deactivate primary ray. Not sure why r->deactivate wouldn't work
-         
+         m_rays[i].deactivate(); // deactivate primary ray. Not sure why r->deactivate wouldn't work TODO check this
       }
       
+      // TODO feel like this should be handled in ray, but I guess that class has no knowledge of simulation size
+      // seems fine then
       if (current_pixel.first < 0 || current_pixel.first >= m_N || \
           current_pixel.second < 0 || current_pixel.second >= m_N){
          m_rays[i].deactivate();
          DEBUG(DB_TRACE, printf("Deactivated vector %d because out-of-bounds\n", i));
       }
-
       
       
       DEBUG(DB_TRACE, printf("Ray %d finished. Visited pixel %d, %d. Distance traveled is %.2f. Generated %lu secondary rays\n\n", \
@@ -159,14 +162,10 @@ int SimulationSerial::_evolve_rays(){
    }
    //DEBUG(DB_TRACE, printf("%lu vectors remaining\n", m_rays.size()));
    return rays_evolved;
-   /*
-   for (int i = 0; i < to_remove.size(); i++){
-      int remove = to_remove[i] - i;
-      m_rays.erase(m_rays.begin() + remove);
-   }*/
+   
 }
 
-
+// JK read
 /* Determine whether primary ray interacts at current pixel
    If it does, deposit fraction of energy there
    */
@@ -193,11 +192,11 @@ bool SimulationSerial::_random_interact(Ray *r, PIXEL visited, double distance){
    return result;
 }
 
+// JK read
 /// Generate secondary rays from primary ray
 std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    std::vector<Ray> result;
    
-
    PIXEL current_pixel = primary->get_current_pixel();
    PIXEL_EDGE current_edge = primary->get_current_edge();
    double energy_remaining = primary->get_current_energy();
@@ -209,12 +208,17 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
       double source_angle = _random_source_angle(false); // random source angle (normal dist=false)
       std::pair<int, int> adjustments = _fix_position(current_edge, primary->m_angle, source_angle);
       
+      // TODO: make adjust pixel function?
+      // More generally why does secondary ray origin depend on primary ray angle?
+      // I say we just spawn secondary rays from center of pixel where interaction occured
       PIXEL adjusted_pixel(current_pixel.first + adjustments.first, current_pixel.second + adjustments.second);
    
       Ray secondary_ray = Ray(false, source_angle, adjusted_pixel, current_edge, current_edge_dist, partial_energy);
       if (adjustments.first != 0 || adjustments.second != 0){
          secondary_ray.set_corrected();
       }
+      
+      // why are both of these being updated?
       result.push_back(secondary_ray);
       m_rays.push_back(secondary_ray);
    }
@@ -224,6 +228,7 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    return result;
 }
 
+// JK read
 void SimulationSerial::print_densities(){
    std::cout << "m_densities: " << std::endl;
    for (int i = 0; i < m_N; i++){
@@ -234,6 +239,7 @@ void SimulationSerial::print_densities(){
    }
 }
 
+// JK read
 void SimulationSerial::print_doses(){
    std::cout << "m_doses: " << std::endl;
    for (int i = 0; i < m_N; i++){
@@ -244,6 +250,7 @@ void SimulationSerial::print_doses(){
    }
 }
 
+// JK read
 double SimulationSerial::_normalize_angle(double angle){
    while (angle < 0){
       angle += 2 * M_PI;
@@ -254,8 +261,9 @@ double SimulationSerial::_normalize_angle(double angle){
    return angle;
 }
 
+// JK read
 /* Secondary rays deposit energy into the pixel they visited
-   Rethink this????
+   Rethink this???? TODO: what do you mean?
    
    Currently, each secondary ray has initial energy of E0 / KS.
    So deposit random fraction of this initial energy
@@ -264,7 +272,7 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
    int i = visited.first, j = visited.second;
    double density = m_densities[i][j];
    double l_ep = density * distance;
-   double initial_energy = E0 / KS;
+  
    double current_energy = r->get_current_energy();
    double energy_deposited = std::min(G * l_ep * E0 / KS, current_energy);
    m_doses[i][j] += energy_deposited;
@@ -276,6 +284,8 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
    DEBUG(DB_SECONDARY, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
 }
 
+// JK read
+// confused by arguments here, I think they might be mixed up
 std::pair<int,int> SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
    std::pair<int,int> result(0,0);
    if (edge == PIXEL_EDGE::RIGHT){
@@ -308,24 +318,26 @@ std::pair<int,int> SimulationSerial::_fix_position(PIXEL_EDGE edge, double curre
    return result;
 }
 
+/// JK read
+//  I transposed these for easier plotting
 void SimulationSerial::write_to_file(){
    std::ofstream densities;
    densities.open("densities.csv");
-   for (int i = 0; i < m_densities.size(); i++){
-      for (int j = 0; j < m_densities.size() - 1; j++){
+   for (int j = 0; j < m_densities.size(); j++){
+      for (int i = 0; i < m_densities.size() - 1; i++){
          densities << m_densities[i][j] << ",";
       }
-      densities << m_densities[i][m_densities.size() - 1] << "\n";
+      densities << m_densities[m_densities.size() - 1][j] << "\n";
    }
    densities.close();
 
    std::ofstream doses;
    doses.open("doses.csv");
-   for (int i = 0; i < m_doses.size(); i++){
-      for (int j = 0; j < m_doses.size() - 1; j++){
+   for (int j = 0; j < m_doses.size(); j++){
+      for (int i = 0; i < m_doses.size() - 1; i++){
          doses << m_doses[i][j] << ",";
       }
-      doses << m_doses[i][m_doses.size() - 1] << "\n";
+      doses << m_doses[m_doses.size() - 1][j] << "\n";
    }
    doses.close();
 

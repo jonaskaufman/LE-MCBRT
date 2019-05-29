@@ -2,14 +2,14 @@
 #define PARAMETERS_H
 
 /// Simulation parameters
-#define D 10.0      /// source distance
+#define D 1.0      /// source distance
 #define MEAN 0.0	/// source angle mean
-#define SIGMA 5.0   /// source angle std dev in radians
+#define SIGMA 1.0   /// source angle std dev in radians
 #define E0 1000.0    /// initial primary ray energy
-#define A 0.1       /// primary ray interaction probability scaling
-#define F 0.1       /// primary ray interaction energy fraction
+#define A 1.0       /// primary ray interaction probability scaling
+#define F 0.5       /// primary ray interaction energy fraction
 #define G 0.01       /// secondary ray deposition constant (is this necessary?)
-#define KS 4		// number of secondary rays to spawn after interaction
+#define KS 10		// number of secondary rays to spawn after interaction
 #define MIN_ENERGY  0.000000001 // minimum energy a secondary ray can have before dying
 							// useful to avoid comparing to 0 which can cause error
 

@@ -45,6 +45,8 @@ class SimulationSerial
     
     private:
     const int m_N;                                      /// number of pixels per side
+    
+    // JK: is it ok to store these as std vectors rather than arrays? for GPU impl?
     std::vector< std::vector<double>> m_densities;      /// grid of density values
     std::vector< std::vector<double>> m_doses;          /// grid of dose values
     std::vector<Ray> m_rays;                            /// active rays
