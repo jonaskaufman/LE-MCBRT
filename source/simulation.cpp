@@ -335,7 +335,7 @@ void SimulationSerial::write_to_file(){
       for (int j = 0; j < m_doses.size() - 1; j++){
          doses << m_doses[i][j] << ",";
       }
-      densities << m_doses[i][m_doses.size() - 1] << "\n";
+      doses << m_doses[i][m_doses.size() - 1] << "\n";
    }
    doses.close();
 
