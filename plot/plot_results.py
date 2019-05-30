@@ -6,6 +6,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 colormap = "plasma"
 max_density = 1.0
 log_scale_dose = True
+log_zero_offset = 0.000000001
 
 # Nice colorbars (from https://joseph-long.com/writing/colorbars/)
 def colorbar(mappable):
@@ -22,7 +23,7 @@ doses_path="../source/doses.csv"
 # Load data
 densities = np.loadtxt(densities_path, delimiter=',')
 doses = np.loadtxt(doses_path, delimiter=',')
-if log_scale_dose: doses = np.log(doses)
+if log_scale_dose: doses = np.log(doses + log_zero_offset)
 
 # Plot data
 f, (ax1, ax2) = plt.subplots(1, 2)
@@ -42,4 +43,4 @@ ax2.axis('off')
 
 plt.tight_layout()
 plt.show()
-
+# TODO add save to file
