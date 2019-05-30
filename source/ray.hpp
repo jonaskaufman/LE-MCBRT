@@ -54,7 +54,7 @@ class Ray
     double m_current_energy;                /// energy remaining, becomes inactive when 0
     bool m_corrected = true;                /// whether ray is corrected
 
-    /// description?
+    /// Updates meta-data about the ray, such as it's current pixel and edge distance
     PIXEL _update_ray(int delta_x, int delta_y, double a, double b);
 
     /// String name of given edge

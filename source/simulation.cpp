@@ -73,8 +73,8 @@ void SimulationSerial::_spawn_primary_ray(){
    
    double x_coord = middle_pixel + horiz_dist; // x coordinate on top edge that primary ray originates from
    
-   if (x_coord < 0 || x_coord >= m_N){ // primary ray missed the grid
-      DEBUG(DB_INITPRIM, printf("\n"));
+   if (x_coord < 0 || x_coord >= m_N || (source_angle >= M_PI / 4 && source_angle <= 3 * M_PI / 4)){ // primary ray missed the grid
+      DEBUG(DB_INITPRIM, printf("primay ray missed the grid\n"));
       return;
    }
    DEBUG(DB_INITPRIM, printf("x_coord: %.2f\n", x_coord));
@@ -97,7 +97,7 @@ void SimulationSerial::_evolve_to_completion(){
    while (rays_evolved > 0){
       rays_evolved = _evolve_rays();
       DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
-      DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(10)));
+      DEBUG(DB_SECONDARY, std::this_thread::sleep_for(std::chrono::milliseconds(0)));
    }
    // rays.clear()
 }
@@ -202,13 +202,14 @@ std::vector<Ray> SimulationSerial::_spawn_secondary_rays(Ray *primary){
    double energy_remaining = primary->get_current_energy();
    double partial_energy = energy_remaining / KS;
    double current_edge_dist = primary->get_current_edge_dist();
+   double current_angle = primary->m_angle;
 
    for (int i = 0; i < KS; i++){
       DEBUG(DB_SECONDARY, printf("Secondary %d:\n", i));
       double source_angle = _random_source_angle(false); // random source angle (normal dist=false)
       
       
-      std::pair<int, int> adjustments = _fix_position(current_edge, primary->m_angle, source_angle);
+      std::pair<int, int> adjustments = _fix_position(current_edge, current_angle, source_angle);
       
       // TODO: make adjust pixel function?
       // More generally why does secondary ray origin depend on primary ray angle?
@@ -293,6 +294,7 @@ void SimulationSerial::_deposit_energy(Ray *r, PIXEL visited, double distance){
 // confused by arguments here, I think they might be mixed up
 PIXEL SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle){
    std::pair<int,int> result(0,0);
+   //DEBUG(DB_SECONDARY, printf("fixing position. Current angle: %.2f\t New angle: %.2f\n", current_angle * 180 / M_PI, new_angle * 180 / M_PI));
    if (edge == PIXEL_EDGE::RIGHT){
       if (current_angle > M_PI && new_angle < M_PI){
          result.first = -1;
