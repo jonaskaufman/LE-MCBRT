@@ -24,6 +24,7 @@ public:
     /// Initalize densities
     void initialize_densities_random();
     void initialize_densities_constant(const double density);
+    void initialize_densities_gaussian(const double peak_density, const double spread);
 
     /// Run simulation for a given number of primary rays
     void run(int num_primary_rays);
@@ -42,7 +43,8 @@ public:
                                                         1.0}; // uniform distribution, pass {lowerbound, upperbound}
     std::uniform_real_distribution<double> uniform_angle_dist{0.0,
                                                               2 * M_PI}; // uniform distributioin between 0 and 2 pi
-    std::normal_distribution<double> normal_dist{MEAN, SIGMA};           // normal distribribution, pass {mean, stddev}
+    std::normal_distribution<double> normal_dist{PARAM_MEAN,
+                                                 PARAM_SIGMA}; // normal distribribution, pass {mean, stddev}
 
 private:
     const int m_N; /// number of pixels per side
@@ -71,17 +73,14 @@ private:
     bool _random_interact(Ray* r, PIXEL visited, double distance);
 
     /// Generate secondary rays from primary ray
-//    std::vector<Ray> _spawn_secondary_rays(Ray* primary); // TODO no ray argument
-
-    /// Enforce limits: 0 <= angle < 2*pi
-    double _normalize_angle(double angle);
+    //    std::vector<Ray> _spawn_secondary_rays(Ray* primary); // TODO no ray argument
 
     /// Deposit energy from ray to pixel visited
     void _deposit_energy(Ray* r, PIXEL visited, double distance);
 
     /// Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary
     /// ray Returns corrections to current pixel
-//    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
+    //    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
 };
 
 #endif

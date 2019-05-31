@@ -29,13 +29,12 @@ public:
 
     /// Trace ray through current pixel and return:
     ///     - distance travelled in pixel
-    ///     - i,j for next pixel
+    ///     - pixel visited
     std::pair<double, PIXEL> trace();
 
     /// Ray activation / correction
     void deactivate();
-    bool is_active();
-    //void set_corrected();
+    bool is_active(); 
 
     /// Access data
     PIXEL get_current_pixel();
@@ -56,11 +55,11 @@ private:
                                 // becomes inactive when dist is out of bounds
     double m_current_energy;    /// energy remaining, becomes inactive when 0
 
-    /// Updates meta-data about the ray, such as it's current pixel and edge distance
-    PIXEL _update_ray(int delta_x, int delta_y, double a, double b);
-
     /// String name of given edge
     std::string _get_edge_name(PIXEL_EDGE edge);
+    
+    std::pair<double, double> _get_local_pixel_coordinates();
+
 };
 
 #endif

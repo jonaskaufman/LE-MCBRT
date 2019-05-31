@@ -2,16 +2,17 @@
 #define PARAMETERS_H
 
 /// Simulation parameters
-#define D 10.0    /// source distance
-#define MEAN 0.0  /// source angle mean
-#define SIGMA 0.5 /// source angle std dev in radians
-#define E0 1000.0 /// initial primary ray energy
-#define A 2.0     /// primary ray interaction probability scaling
-#define F 0.5     /// primary ray interaction energy fraction
-#define G 0.1     /// secondary ray deposition constant
-#define KS 10     /// number of secondary rays to spawn after interaction
-#define MIN_ENERGY 0.000000001 /// minimum energy a secondary ray can have before dying
-                               /// useful to avoid comparing to 0 which can cause error
+#define PARAM_D 10.0    /// source distance
+#define PARAM_MEAN 0.0  /// source angle mean
+#define PARAM_SIGMA 0.5 /// source angle std dev in radians
+#define PARAM_E0 1000.0 /// initial primary ray energy
+#define PARAM_A 3.0     /// primary ray interaction probability scaling
+#define PARAM_F 0.25    /// primary ray interaction energy fraction
+#define PARAM_G 0.01    /// secondary ray deposition constant
+#define PARAM_KS 10     /// number of secondary rays to spawn after interaction
+#define PARAM_MINERGY                                                                                                     \
+    0.000000001 /// minimum energy a secondary ray can have before dying
+                /// useful to avoid comparing to 0 which can cause error
 
 /// Label the pixel edges
 enum class PIXEL_EDGE
@@ -32,7 +33,7 @@ enum class PIXEL_EDGE
     }
 
 /* Debug codes */
-#define CUR_DEBUG DEBUG_ALL
+#define CUR_DEBUG DB_TRACE
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0

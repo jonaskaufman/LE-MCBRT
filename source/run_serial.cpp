@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     if (density == -1)
     {
         DEBUG(DB_SIMCONST, std::cout << "density is -1" << std::endl);
-        s.initialize_densities_random();
+        s.initialize_densities_random();   
     }
     else
     {
