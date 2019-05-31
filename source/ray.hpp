@@ -35,7 +35,7 @@ public:
     /// Ray activation / correction
     void deactivate();
     bool is_active();
-    void set_corrected();
+    //void set_corrected();
 
     /// Access data
     PIXEL get_current_pixel();
@@ -52,10 +52,9 @@ private:
     const bool m_primary;       /// whether ray is primary
     PIXEL m_current_pixel;      /// current pixel
     PIXEL_EDGE m_current_edge;  /// current edge
-    double m_current_edge_dist; /// current distance along edge (from TOP or LEFT),
+    double m_current_edge_dist; /// current distance along edge (from TOP or LEFT of current pixel),
                                 // becomes inactive when dist is out of bounds
     double m_current_energy;    /// energy remaining, becomes inactive when 0
-    bool m_corrected = true;    /// whether ray is corrected TODO what is this?
 
     /// Updates meta-data about the ray, such as it's current pixel and edge distance
     PIXEL _update_ray(int delta_x, int delta_y, double a, double b);

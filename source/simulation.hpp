@@ -55,8 +55,11 @@ private:
     /// Randomly sample source angle for primary rays
     double _random_source_angle(bool normal);
 
-    /// Generate new primary ray
+    /// Generate new primary ray from source
     void _spawn_primary_ray();
+
+    /// Generate secondary rays from interaction point
+    void _spawn_secondary_rays(PIXEL spawn_pixel, double total_energy);
 
     /// Evolve all rays by one step
     int _evolve_rays();
@@ -68,7 +71,7 @@ private:
     bool _random_interact(Ray* r, PIXEL visited, double distance);
 
     /// Generate secondary rays from primary ray
-    std::vector<Ray> _spawn_secondary_rays(Ray* primary); // TODO no ray argument
+//    std::vector<Ray> _spawn_secondary_rays(Ray* primary); // TODO no ray argument
 
     /// Enforce limits: 0 <= angle < 2*pi
     double _normalize_angle(double angle);
@@ -78,7 +81,7 @@ private:
 
     /// Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary
     /// ray Returns corrections to current pixel
-    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
+//    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
 };
 
 #endif
