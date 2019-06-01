@@ -8,9 +8,9 @@
 #define PARAM_E0 1000.0 /// initial primary ray energy
 #define PARAM_A 3.0     /// primary ray interaction probability scaling
 #define PARAM_F 0.25    /// primary ray interaction energy fraction
-#define PARAM_G 0.01    /// secondary ray deposition constant
+#define PARAM_G 0.01     /// secondary ray deposition constant
 #define PARAM_KS 10     /// number of secondary rays to spawn after interaction
-#define PARAM_MINERGY                                                                                                     \
+#define PARAM_MINERGY                                                                                                  \
     0.000000001 /// minimum energy a secondary ray can have before dying
                 /// useful to avoid comparing to 0 which can cause error
 
@@ -33,7 +33,7 @@ enum class PIXEL_EDGE
     }
 
 /* Debug codes */
-#define CUR_DEBUG DB_TRACE
+#define CUR_DEBUG DB_INITSECOND
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0
@@ -43,5 +43,6 @@ enum class PIXEL_EDGE
 #define DB_TRACE 4     // tracing ray from pixel to pixel
 #define DB_INTERACT 5  // probabilitisticly determining an interaction point
 #define DB_SECONDARY 6 // spawn and evolve secondary rays to completion
+#define DB_INITSECOND 7 // spawn secondary rays
 
 #endif

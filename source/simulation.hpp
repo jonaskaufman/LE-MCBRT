@@ -21,10 +21,19 @@ public:
     SimulationSerial() = delete;
     SimulationSerial(const int N);
 
-    /// Initalize densities
+    /// Initialize densities randomly between 0 and 1
     void initialize_densities_random();
+
+    /// Initialize densities to constant value
     void initialize_densities_constant(const double density);
-    void initialize_densities_gaussian(const double peak_density, const double spread);
+
+    /// Initialize densities to 2D Gaussian centered on the grid,
+    //  with spread (std dev) given as fraction of grid size
+    void initialize_densities_centered_gaussian(const double max_density, const double spread);
+
+    // Initialize densities with multiple Gaussians at random positions
+    // Result is normalized to given max_density
+    void initialize_densities_random_gaussians(const int n_gaussians, const double max_density, const double spread);
 
     /// Run simulation for a given number of primary rays
     void run(int num_primary_rays);
@@ -56,6 +65,9 @@ private:
 
     /// Randomly sample source angle for primary rays
     double _random_source_angle(bool normal);
+
+    /// Check if a given pixel lies outside the bounds of the grid
+    bool _out_of_bounds(const PIXEL& current_pixel);
 
     /// Generate new primary ray from source
     void _spawn_primary_ray();

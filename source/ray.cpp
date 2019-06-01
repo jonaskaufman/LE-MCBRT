@@ -309,7 +309,7 @@ std::string Ray::_get_edge_name(PIXEL_EDGE edge)
     }
 }
 
-Ray::~Ray() { DEBUG(DB_TRACE, "Ray is getting deleted"); }
+//Ray::~Ray() { DEBUG(DB_TRACE, "Ray is getting deleted"); }
 
 void Ray::deactivate() { m_active = false; }
 

@@ -16,15 +16,11 @@ class Ray
 {
 public:
     Ray() = delete;
-    ~Ray();
-    Ray(const bool primary,
-        const double angle,
-        PIXEL current_pixel,
-        PIXEL_EDGE current_edge,
-        double current_edge_dist,
-        double current_energy); // TODO make private
 
+    /// Named constructor for primary rays
     static Ray primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist);
+    
+    /// Named constructor for secondary rays, originating from center of given pixel
     static Ray secondary_from_center(const double angle, PIXEL spawn_pixel, double energy);
 
     /// Trace ray through current pixel and return:
@@ -34,7 +30,7 @@ public:
 
     /// Ray activation / correction
     void deactivate();
-    bool is_active(); 
+    bool is_active();
 
     /// Access data
     PIXEL get_current_pixel();
@@ -47,6 +43,14 @@ public:
     const double m_angle; /// angle of ray, ideally should be private
 
 private:
+    /// Full parameterized constructor
+    Ray(const bool primary,
+        const double angle,
+        PIXEL current_pixel,
+        PIXEL_EDGE current_edge,
+        double current_edge_dist,
+        double current_energy);
+
     bool m_active;              /// whether ray is active
     const bool m_primary;       /// whether ray is primary
     PIXEL m_current_pixel;      /// current pixel
@@ -57,9 +61,8 @@ private:
 
     /// String name of given edge
     std::string _get_edge_name(PIXEL_EDGE edge);
-    
-    std::pair<double, double> _get_local_pixel_coordinates();
 
+    std::pair<double, double> _get_local_pixel_coordinates();
 };
 
 #endif
