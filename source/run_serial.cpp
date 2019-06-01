@@ -6,59 +6,129 @@
 
 int main(int argc, char** argv)
 {
-    if (argc != 4)
+    if (argc < 4)
     {
-        std::cerr << "Invalid number of arguments. [grid size] [density (or -1 for random)] [# of primary rays]"
+        std::cerr << "Invalid number of arguments [grid size] [number of primary rays] [density initialization method] "
+                     "[additional]"
                   << std::endl;
+        std::cerr << "Initialization methods and their additional arguments are:" << std::endl;
+        std::cerr << "C - Constant [density]" << std::endl;
+        std::cerr << "R - Random" << std::endl;
+        std::cerr << "G - Gaussian [maximum density] [spread]" << std::endl;
+        std::cerr << "M - Multiple random Gaussians [number of Gaussians] [maximum density] [spread]" << std::endl;
         exit(1);
     }
 
+    // Grid size
     const int N = atoi(argv[1]);
-
     if (N < 1)
     {
-        std::cerr << "grid size must be greater than 0" << std::endl;
+        std::cerr << "Grid size must be greater than 0" << std::endl;
         exit(1);
     }
-    DEBUG(DB_ARGPASS, std::cout << "N is " << N << std::endl);
 
-    const double density = strtod(argv[2], NULL);
-    if ((density != -1) && (density < 0 || density > 1))
-    {
-        std::cerr << "density must be between 0 and 1 (or -1 for random densities)";
-    }
-    DEBUG(DB_ARGPASS, std::cout << "density is " << density << std::endl);
-
-    const int ray_count = atoi(argv[3]);
+    // Number of rays
+    const int ray_count = atoi(argv[2]);
     if (ray_count < 1)
     {
-        std::cerr << "ray count must be greater than 0";
+        std::cerr << "Ray count must be greater than 0" << std::endl;
+        exit(1);
     }
-    DEBUG(DB_ARGPASS, std::cout << "ray count is " << ray_count << std::endl);
 
-    DEBUG(DB_ARGPASS, std::cout << "about to create simulation" << std::endl);
-
-    // create simulation class
+    // Create simulation
     SimulationSerial s = SimulationSerial(N);
-    DEBUG(DB_SIMCONST, std::cout << "created simulation" << std::endl);
 
-    // initialize grid
-    if (density == -1)
+    // Initialize densities according to given method
+    int init_method_arg = 3;
+    switch (argv[init_method_arg][0])
     {
-        DEBUG(DB_SIMCONST, std::cout << "density is -1" << std::endl);
-        s.initialize_densities_random();   
-    }
-    else
+    case 'C': // constant
     {
-        DEBUG(DB_SIMCONST, std::cout << "density is not -1" << std::endl);
+        if (argc < (init_method_arg + 1 + 1))
+        {
+            std::cerr << "Not enough arguments for chosen initialization option" << std::endl;
+            exit(1);
+        }
+
+        const double density = strtod(argv[init_method_arg + 1], NULL);
+        if (density < 0 || density > 1)
+        {
+            std::cerr << "Density must be between 0 and 1" << std::endl;
+            exit(1);
+        }
+
         s.initialize_densities_constant(density);
+        break;
+    }
+    case 'R': // random
+    {
+        s.initialize_densities_random();
+        break;
     }
 
-    // run a given number of rays
+    case 'G': // centered Gaussian
+    {
+        if (argc < (init_method_arg + 1 + 2))
+        {
+            std::cerr << "Not enough arguments for chosen initialization option" << std::endl;
+            exit(1);
+        }
+
+        const double max_density = strtod(argv[init_method_arg + 1], NULL);
+        if (max_density < 0 || max_density > 1)
+        {
+            std::cerr << "Density must be between 0 and 1" << std::endl;
+            exit(1);
+        }
+        const double spread = strtod(argv[init_method_arg + 2], NULL);
+
+        s.initialize_densities_centered_gaussian(max_density, spread);
+        break;
+    }
+
+    case 'M': // multiple random Gaussians
+    {
+        if (argc < (init_method_arg + 1 + 3))
+        {
+            std::cerr << "Not enough arguments for chosen initialization option" << std::endl;
+            exit(1);
+        }
+
+        const int number = atoi(argv[init_method_arg + 1]);
+        if (number < 1)
+        {
+            std::cerr << "Number of Gaussians must be greater than 0" << std::endl;
+            exit(1);
+        }
+
+        const double max_density = strtod(argv[init_method_arg + 2], NULL);
+        if (max_density < 0 || max_density > 1)
+        {
+            std::cerr << "Density must be between 0 and 1" << std::endl;
+            exit(1);
+        }
+        const double spread = strtod(argv[init_method_arg + 3], NULL);
+
+        s.initialize_densities_random_gaussians(number, max_density, spread);
+        break;
+    }
+
+    default:
+    {
+        std::cerr << "Invalid initialization method given" << std::endl;
+        exit(1);
+        break;
+    }
+    }
+
+    // Write densities
+    s.write_densities_to_file("densities.csv");
+
+    // Run a given number of rays
     s.run(ray_count);
 
-    // write result
-    s.write_to_file();
+    // Write result
+    s.write_doses_to_file("doses.csv");
 
     return 0;
 }

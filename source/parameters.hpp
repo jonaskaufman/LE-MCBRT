@@ -33,7 +33,7 @@ enum class PIXEL_EDGE
     }
 
 /* Debug codes */
-#define CUR_DEBUG DB_EVOLVE_SEC
+#define CUR_DEBUG NO_DEBUG
 #define DEBUG_ALL -1
 
 #define NO_DEBUG 0

@@ -4,7 +4,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Plot parameters
 colormap = "plasma"
-max_density = 1.0
 log_scale_dose = True
 log_zero_offset = 0.000000001
 
@@ -26,10 +25,10 @@ doses = np.loadtxt(doses_path, delimiter=',')
 if log_scale_dose: doses = np.log(doses + log_zero_offset)
 
 # Plot data
-f, (ax1, ax2) = plt.subplots(1, 2)
+f, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
 
 ax1.set_title("density")
-im1 = ax1.imshow(densities, cmap=colormap, vmin=0.0, vmax=max_density)
+im1 = ax1.imshow(densities, cmap=colormap, vmin=0.0, vmax=1.0)
 colorbar(im1)
 ax1.axis('off')
 
