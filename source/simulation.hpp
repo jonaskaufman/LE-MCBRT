@@ -19,6 +19,8 @@ class SimulationSerial
 {
 public:
     SimulationSerial() = delete;
+
+    /// Constructor
     SimulationSerial(const int N);
 
     /// Initialize densities randomly between 0 and 1
@@ -31,20 +33,16 @@ public:
     //  with spread (std dev) given as fraction of grid size
     void initialize_densities_centered_gaussian(const double max_density, const double spread);
 
-    // Initialize densities with multiple Gaussians at random positions
-    // Result is normalized to given max_density
+    /// Initialize densities with multiple Gaussians at random positions
+    //  Result is normalized to given max_density
     void initialize_densities_random_gaussians(const int n_gaussians, const double max_density, const double spread);
 
     /// Run simulation for a given number of primary rays
-    void run(int num_primary_rays);
+    void run(const int num_primary_rays);
 
-    /// Get array of doses
-    /// std::vector< std::vector<double>> get_doses();
-
-    /// Print data
-    void print_densities();
-    void print_doses();
-    void write_to_file();
+    /// Write data
+    void write_densities_to_file(const std::string& filename);
+    void write_doses_to_file(const std::string& filename);
 
     /// Random distributions
     std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
@@ -56,12 +54,10 @@ public:
                                                  PARAM_SIGMA}; // normal distribribution, pass {mean, stddev}
 
 private:
-    const int m_N; /// number of pixels per side
-
-    // JK: is it ok to store these as std vectors rather than arrays? for GPU impl?
-    std::vector<std::vector<double>> m_densities; /// grid of density values
-    std::vector<std::vector<double>> m_doses;     /// grid of dose values
-    std::vector<Ray> m_rays;                      /// active rays
+    const int m_N;                                // number of pixels per side
+    std::vector<std::vector<double>> m_densities; // grid of density values
+    std::vector<std::vector<double>> m_doses;     // grid of dose values
+    std::vector<Ray> m_rays;                      // active rays
 
     /// Randomly sample source angle for primary rays
     double _random_source_angle(bool normal);
@@ -75,24 +71,18 @@ private:
     /// Generate secondary rays from interaction point
     void _spawn_secondary_rays(PIXEL spawn_pixel, double total_energy);
 
-    /// Evolve all rays by one step
+    /// Determine whether primary ray interacts at visited pixel based on distance travelled
+    bool _random_interact(PIXEL target_pixel, double distance);
+
+    /// Transfer energy from ray to target pixel,
+    //  where the actual energy transferred is scaled by the pixel density
+    void _transfer_energy(Ray* ray, PIXEL target_pixel, double unscaled_energy);
+
+    /// Evolve all active rays by one step, return the number of rays evolved
     int _evolve_rays();
 
-    /// Evolve all rays until complete
+    /// Evolve all rays until complete, i.e. none are active
     void _evolve_to_completion();
-
-    /// Determine whether primary ray interacts at current pixel
-    bool _random_interact(Ray* r, PIXEL visited, double distance);
-
-    /// Generate secondary rays from primary ray
-    //    std::vector<Ray> _spawn_secondary_rays(Ray* primary); // TODO no ray argument
-
-    /// Deposit energy from ray to pixel visited
-    void _deposit_energy(Ray* r, PIXEL visited, double distance);
-
-    /// Fixes position discrepency when spawning secondary rays that are going in the opposite direction of the primary
-    /// ray Returns corrections to current pixel
-    //    PIXEL _fix_position(PIXEL_EDGE edge, double current_angle, double new_angle);
 };
 
 #endif

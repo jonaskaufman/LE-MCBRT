@@ -68,7 +68,6 @@ Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
 
     DEBUG(DB_TRACE, printf("New secondary ray edge dist %.5f\n", new_edge_dist));
 
-    // TODO need to check edges for out of bounds, could do in simulation class
     return Ray(false, angle, new_pixel, new_edge, new_edge_dist, energy);
 }
 
@@ -309,7 +308,7 @@ std::string Ray::_get_edge_name(PIXEL_EDGE edge)
     }
 }
 
-//Ray::~Ray() { DEBUG(DB_TRACE, "Ray is getting deleted"); }
+// Ray::~Ray() { DEBUG(DB_TRACE, "Ray is getting deleted"); }
 
 void Ray::deactivate() { m_active = false; }
 

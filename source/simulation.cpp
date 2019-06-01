@@ -183,18 +183,12 @@ bool SimulationSerial::_out_of_bounds(const PIXEL& current_pixel)
             current_pixel.second >= m_N);
 }
 
-/* Continue to evolve rays as long as there are rays to evolve.
-   Couldn't get vector to delete the rays so rays are deactivated instead.
-   If a ray is deactivated, for loop goes to next ray
-   For loop returns number of rays it evolved.
-*/
 void SimulationSerial::_evolve_to_completion()
 {
     int rays_evolved = m_rays.size();
     while (rays_evolved > 0)
     {
         rays_evolved = _evolve_rays();
-        DEBUG(DB_SECONDARY, printf("rays_evolved: %d\n\n", rays_evolved));
     }
 
     // Clear out the ray vector
@@ -202,9 +196,6 @@ void SimulationSerial::_evolve_to_completion()
     return;
 }
 
-/* Evolve all active rays.
-   Return number of rays evolved
-*/
 int SimulationSerial::_evolve_rays()
 {
 
@@ -214,222 +205,109 @@ int SimulationSerial::_evolve_rays()
     {
         Ray* r = &m_rays[i];
 
-        if (r->is_active() == false)
+        // Only evolve active rays
+        if (r->is_active())
         {
-            DEBUG(DB_SECONDARY, printf("ray %d is not active\n", i));
-            continue;
+            // Trace ray
+            std::pair<double, PIXEL> rtrace = r->trace();
+            double travel_distance = rtrace.first; // distance traveled in visited pixel
+            PIXEL visited_pixel = rtrace.second;
+            rays_evolved++;
+
+            if (r->is_primary()) // primary ray
+            {
+                if (_random_interact(visited_pixel, travel_distance))
+                {
+                    DEBUG(DB_EVOLVE_PRI, std::cout << "Primary ray " << i << " interacted" << std::endl);
+                    // Deposit energy to pixel
+                    DEBUG(DB_EVOLVE_PRI, std::cout << "Starting energy " << r->get_current_energy() << std::endl);
+                    double energy_to_deposit = PARAM_F * travel_distance * r->get_current_energy();
+                    _transfer_energy(r, visited_pixel, energy_to_deposit);
+                    DEBUG(DB_EVOLVE_PRI, std::cout << "Energy after deposit " << r->get_current_energy() << std::endl);
+
+                    // Spawn secondary rays, transferring remaining energy to them
+                    _spawn_secondary_rays(visited_pixel, r->get_current_energy());
+                    r->set_current_energy(0);
+                }
+            }
+            else // secondary ray
+            {
+                double energy_to_deposit = PARAM_G * travel_distance;
+                DEBUG(DB_EVOLVE_SEC, std::cout << "Secondary ray " << i << " depositing energy" << std::endl);
+                DEBUG(DB_EVOLVE_SEC, std::cout << "Starting energy " << r->get_current_energy() << std::endl);
+                DEBUG(DB_EVOLVE_SEC, std::cout << "Unscaled energy to deposit " << energy_to_deposit << std::endl);
+                _transfer_energy(r, visited_pixel, energy_to_deposit);
+                DEBUG(DB_EVOLVE_SEC, std::cout << "Energy after deposit " << r->get_current_energy() << std::endl);
+            }
+
+            // Deactivate ray if out of energy or outside of the grid bounds
+            if (r->get_current_energy() < PARAM_MINERGY || _out_of_bounds(r->get_current_pixel()))
+            {
+                DEBUG(DB_EVOLVE_SEC,
+                      std::cout << "Ray " << i << " is out of energy or bounds, deactivating" << std::endl);
+                r->deactivate();
+            }
         }
-        DEBUG(DB_SECONDARY, printf("ray %d is active\n", i));
-        if (r->is_primary() == true)
-        {
-            DEBUG(DB_SECONDARY, printf("ray %d is primary\n", i));
-        }
-        else
-        {
-            DEBUG(DB_SECONDARY, printf("ray %d is secondary\n", i));
-        }
-
-        rays_evolved++;
-
-        /// trace ray
-        std::pair<double, PIXEL> rtrace = r->trace();
-        double distance_traveled = rtrace.first;
-        PIXEL visited_pixel = rtrace.second;          // pixel visited TODO spawn secondary rays from here
-        PIXEL current_pixel = r->get_current_pixel(); // updated new pixel? what if it goes off the edge? TODO
-
-        std::vector<Ray> new_rays; // TODO needed if primary?
-
-        if (r->is_primary() == false)
-        { // secondary rays deposit energy
-            _deposit_energy(r, visited_pixel, distance_traveled);
-            DEBUG(DB_SECONDARY, printf("Remaining energy: %.2f\n", r->get_current_energy()));
-        }
-        else if (_random_interact(r, visited_pixel, distance_traveled))
-        { // primary rays check for interaction
-
-            DEBUG(DB_TRACE, printf("Deactivated vector %d because of interaction\n", i));
-            // new_rays = _spawn_secondary_rays(r);
-
-            //    PIXEL current_pixel = primary->get_current_pixel();
-            //    PIXEL_EDGE current_edge = primary->get_current_edge();
-            //    double energy_remaining = primary->get_current_energy();
-            //    double partial_energy = energy_remaining / PARAM_KS;
-            //    double current_edge_dist = primary->get_current_edge_dist();
-            //    double current_angle = primary->m_angle;
-            DEBUG(DB_TRACE, printf("Spawning secondaries"));
-            _spawn_secondary_rays(visited_pixel, m_rays[i].get_current_energy());
-            m_rays[i].deactivate(); 
-        }
- 
-        if (_out_of_bounds(current_pixel))
-        {
-            DEBUG(DB_TRACE, std::cout << "Ray " << i << " is out-of-bounds, deactivating" << std::endl);
-            m_rays[i].deactivate();
-        }
-
-        DEBUG(
-            DB_TRACE,
-            printf("Ray %d finished. Visited pixel %d, %d. Distance traveled is %.2f. Generated %lu secondary rays\n\n",
-                   i, visited_pixel.first, visited_pixel.second, distance_traveled, new_rays.size()));
     }
     return rays_evolved;
 }
 
-/* Determine whether primary ray interacts at current pixel
-   If it does, deposit fraction of energy there
-   */
-bool SimulationSerial::_random_interact(Ray* r, PIXEL visited, double distance)
+bool SimulationSerial::_random_interact(PIXEL target_pixel, double distance)
 {
-    int i = visited.first, j = visited.second;
+    int i = target_pixel.first, j = target_pixel.second;
     double density = m_densities[i][j];
-    double l_ep = density * distance;
+    double l_ep = density * distance; // effective path length travelled in pixel
     double probability = std::exp(-PARAM_A / l_ep);
     double rand = uniform_dist(random_engine);
-
-    bool result = rand < probability;
-    std::string result_string = result ? "TRUE" : "FALSE";
-
-    DEBUG(DB_INTERACT, printf("l_ep: %.2f\tprobability: %.2f\trand: %.2f\t", l_ep, probability, rand));
-    DEBUG(DB_INTERACT, std::cout << "interact? " << result_string << std::endl);
-
-    if (result)
-    {
-        double energy_deposited = PARAM_F * l_ep * r->get_current_energy();
-        m_doses[i][j] += energy_deposited;
-        r->set_current_energy(r->get_current_energy() - energy_deposited);
-        DEBUG(DB_INTERACT, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
-    }
-
-    return result;
+    return (rand < probability);
 }
 
-void SimulationSerial::print_densities()
+void SimulationSerial::_transfer_energy(Ray* ray, PIXEL target_pixel, double unscaled_energy)
 {
-    std::cout << "m_densities: " << std::endl;
-    for (int i = 0; i < m_N; i++)
-    {
-        for (int j = 0; j < m_N; j++)
-        {
-            printf("%.2f ", m_densities[i][j]);
-        }
-        std::cout << std::endl;
-    }
-    return;
-}
-
-void SimulationSerial::print_doses()
-{
-    std::cout << "m_doses: " << std::endl;
-    for (int i = 0; i < m_N; i++)
-    {
-        for (int j = 0; j < m_N; j++)
-        {
-            printf("%.2f ", m_doses[i][j]);
-        }
-        std::cout << std::endl;
-    }
-    return;
-}
-
-/* Secondary rays deposit energy into the pixel they visited
-   Rethink this???? TODO: what do you mean?
-
-   Currently, each secondary ray has initial energy of E0 / PARAM_KS.
-   So deposit random fraction of this initial energy
-*/
-void SimulationSerial::_deposit_energy(Ray* r, PIXEL visited, double distance)
-{
-    int i = visited.first, j = visited.second;
+    int i = target_pixel.first, j = target_pixel.second;
     double density = m_densities[i][j];
-    double l_ep = density * distance;
+    double transfer_energy = unscaled_energy * density; // scale energy by pixel density
+    double current_ray_energy = ray->get_current_energy();
 
-    double current_energy = r->get_current_energy();
-    double energy_deposited =
-        std::min(PARAM_G * l_ep * PARAM_E0 / PARAM_KS, current_energy); // TODO shouldnt this be current energy?
-    m_doses[i][j] += energy_deposited;
-    r->set_current_energy(current_energy - energy_deposited);
-    if (r->get_current_energy() < PARAM_MINERGY)
-    {
-        r->deactivate();
-        DEBUG(DB_SECONDARY, printf("secondary ray ran out of energy.\n"));
-    }
-    DEBUG(DB_SECONDARY, printf("deposited %.2f energy into pixel %d, %d\n", energy_deposited, i, j));
+    // Ray cannot transfer more energy that it has
+    transfer_energy = fmin(transfer_energy, current_ray_energy);
+
+    // Remove energy from ray and add it to pixel dose
+    ray->set_current_energy(current_ray_energy - transfer_energy);
+    m_doses[i][j] += transfer_energy;
+
+    return;
 }
 
-/*
-PIXEL SimulationSerial::_fix_position(PIXEL_EDGE edge, double current_angle, double new_angle)
+void SimulationSerial::write_densities_to_file(const std::string& filename)
 {
-    std::pair<int, int> result(0, 0);
-    // DEBUG(DB_SECONDARY, printf("fixing position. Current angle: %.2f\t New angle: %.2f\n", current_angle * 180 /
-    // M_PI, new_angle * 180 / M_PI));
-    if (edge == PIXEL_EDGE::RIGHT)
-    {
-        if (current_angle > M_PI && new_angle < M_PI)
-        {
-            result.first = -1;
-            DEBUG(DB_SECONDARY,
-                  printf("Spawned secondary going left but primary was going right. Adjusting pixel location\n"));
-        }
-    }
-    else if (edge == PIXEL_EDGE::LEFT)
-    {
-        if (current_angle < M_PI && new_angle > M_PI)
-        {
-            result.first = 1;
-            DEBUG(DB_SECONDARY,
-                  printf("Spawned secondary going right but primary was going left. Adjusting pixel location\n"));
-        }
-    }
-    else if (edge == PIXEL_EDGE::TOP)
-    {
-        if ((current_angle > M_PI / 2 && current_angle < 3 * M_PI / 2) &&
-            (new_angle < M_PI / 2 || new_angle > 3 * M_PI / 2))
-        {
-            result.second = 1;
-            DEBUG(DB_SECONDARY,
-                  printf("Spawned secondary going down but primary was going up. Adjusting pixel location\n"));
-        }
-    }
-    else
-    {
-        if ((current_angle < M_PI / 2 || current_angle > 3 * M_PI / 2) &&
-            (new_angle > M_PI / 2 && new_angle < 3 * M_PI / 2))
-        {
-            result.second = -1;
-            DEBUG(DB_SECONDARY,
-                  printf("Spawned secondary going up but primary was going down. Adjusting pixel location\n"));
-        }
-    }
-
-    return result;
-}
-*/
-
-void SimulationSerial::write_to_file()
-{
-    std::ofstream densities;
-    densities.open("densities.csv");
+    std::ofstream output;
+    output.open(filename);
     for (int j = 0; j < m_densities.size(); j++)
     {
         for (int i = 0; i < m_densities.size() - 1; i++)
         {
-            densities << m_densities[i][j] << ",";
+            output << m_densities[i][j] << ",";
         }
-        densities << m_densities[m_densities.size() - 1][j] << "\n";
+        output << m_densities[m_densities.size() - 1][j] << "\n";
     }
-    densities.close();
+    output.close();
+    return;
+}
 
-    std::ofstream doses;
-    doses.open("doses.csv");
+void SimulationSerial::write_doses_to_file(const std::string& filename)
+{
+    std::ofstream output;
+    output.open(filename);
     for (int j = 0; j < m_doses.size(); j++)
     {
         for (int i = 0; i < m_doses.size() - 1; i++)
         {
-            doses << m_doses[i][j] << ",";
+            output << m_doses[i][j] << ",";
         }
-        doses << m_doses[m_doses.size() - 1][j] << "\n";
+        output << m_doses[m_doses.size() - 1][j] << "\n";
     }
-    doses.close();
+    output.close();
     return;
 }
 
