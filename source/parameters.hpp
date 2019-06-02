@@ -2,14 +2,14 @@
 #define PARAMETERS_H
 
 /// Simulation parameters
-#define PARAM_D 10.0    /// source distance
+#define PARAM_D 1.0     /// source distance as relative to grid size
 #define PARAM_MEAN 0.0  /// source angle mean
-#define PARAM_SIGMA 0.5 /// source angle std dev in radians
+#define PARAM_SIGMA 0.1 /// source angle std dev in radians
 #define PARAM_E0 1000.0 /// initial primary ray energy
-#define PARAM_A 3.0     /// primary ray interaction probability scaling
-#define PARAM_F 0.25    /// primary ray interaction energy fraction
+#define PARAM_A 2.0     /// primary ray interaction probability scaling
+#define PARAM_F 0.25    /// primary ray interaction energy deposit fraction
 #define PARAM_G 1.0     /// secondary ray deposition constant
-#define PARAM_KS 10     /// number of secondary rays to spawn after interaction
+#define PARAM_KS 20     /// number of secondary rays to spawn after interaction
 #define PARAM_MINERGY                                                                                                  \
     0.000000001 /// minimum energy a secondary ray can have before dying
                 /// useful to avoid comparing to 0 which can cause error
@@ -26,24 +26,28 @@ enum class PIXEL_EDGE
 /* Conditional print macros for debugging */
 #define DEBUG(debugCode, action)                                                                                       \
     {                                                                                                                  \
-        if (CUR_DEBUG == (debugCode) || CUR_DEBUG == DEBUG_ALL)                                                        \
+        if (CUR_DEBUG == debugCode || CUR_DEBUG == DB_ALL)                                                             \
+        {                                                                                                              \
+            action;                                                                                                    \
+        }                                                                                                              \
+        else if (CUR_DEBUG == DB_GENERAL && (debugCode == DB_INIT_PRI || debugCode == DB_INIT_SEC))                    \
         {                                                                                                              \
             action;                                                                                                    \
         }                                                                                                              \
     }
 
 /* Debug codes */
-#define CUR_DEBUG NO_DEBUG
-#define DEBUG_ALL -1
+#define CUR_DEBUG DB_NONE
 
-#define NO_DEBUG 0
-#define DB_ARGPASS 1    // passing arguments to run_serial
-#define DB_SIMCONST 2   // building the simulation
-#define DB_INITPRIM 3   // initializing primary rays
-#define DB_TRACE 4      // tracing ray from pixel to pixel
-#define DB_INTERACT 5   // probabilitisticly determining an interaction point
-#define DB_SECONDARY 6  // spawn and evolve secondary rays to completion
-#define DB_INITSECOND 7 // spawn secondary rays
-#define DB_EVOLVE_PRI 8
-#define DB_EVOLVE_SEC 9
+#define DB_ALL -1
+#define DB_NONE 0
+
+#define DB_GENERAL 1    // general progress
+#define DB_INIT_PRI 2   // initialize primary ray
+#define DB_INIT_SEC 3   // initialize secondary ray
+#define DB_EVOLVE_PRI 4 // evolve primary ray
+#define DB_EVOLVE_SEC 5 // evolve secondary ray
+#define DB_TRACE 6      // trace ray from pixel to pixel
+
 #endif
+

@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     }
 
     // Create simulation
-    SimulationSerial s = SimulationSerial(N);
+    Simulation s = Simulation(N);
 
     // Initialize densities according to given method
     int init_method_arg = 3;
@@ -121,11 +121,13 @@ int main(int argc, char** argv)
     }
     }
 
+    DEBUG(DB_GENERAL, std::cout << "Densities initialized" << std::endl << std::endl);
+
     // Write densities
     s.write_densities_to_file("densities.csv");
 
     // Run a given number of rays
-    s.run(ray_count);
+    s.run_serial(ray_count);
 
     // Write result
     s.write_doses_to_file("doses.csv");

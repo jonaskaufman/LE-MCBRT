@@ -1,20 +1,20 @@
 #include "ray.hpp"
 
-Ray::Ray(const bool primary,
-         const double angle,
-         PIXEL current_pixel,
-         PIXEL_EDGE current_edge,
-         double current_edge_dist,
-         double current_energy)
-    : m_primary(primary), m_angle(angle)
+Ray::Ray(const bool& primary,
+         const double& angle,
+         const PIXEL& pixel,
+         const PIXEL_EDGE& edge,
+         const double& edge_dist,
+         const double& energy)
+    : m_active(true),
+      m_primary(primary),
+      m_angle(angle),
+      m_current_pixel(pixel),
+      m_current_edge(edge),
+      m_current_edge_dist(edge_dist),
+      m_current_energy(energy)
 {
-
-    m_active = true;
-    m_current_pixel = current_pixel;
-    m_current_edge = current_edge;
-    m_current_edge_dist = current_edge_dist;
-    m_current_energy = current_energy;
-} // TODO initialization list
+}
 
 Ray Ray::primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist)
 {
@@ -23,6 +23,9 @@ Ray Ray::primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, d
 
 Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
 {
+    DEBUG(DB_INIT_SEC, std::cout << "New secondary ray spawning from center of pixel " << spawn_pixel.first << ","
+                                 << spawn_pixel.second << " with angle " << angle << " and energy " << energy
+                                 << std::endl);
     PIXEL_EDGE new_edge;
     int flip;
     double offset;
@@ -63,40 +66,30 @@ Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
     // Update pixel and edge dist accordingly
     PIXEL new_pixel(spawn_pixel.first + i_adjust, spawn_pixel.second + j_adjust);
     double new_edge_dist = 0.5 + 0.5 * flip * tan(angle - offset);
-
+    DEBUG(DB_INIT_SEC, std::cout << "Moved to " << _get_edge_name(new_edge) << " edge of pixel " << new_pixel.first
+                                 << "," << new_pixel.second << ", new edge dist is " << new_edge_dist << std::endl);
     assert(new_edge_dist > 0 && new_edge_dist <= 1);
-
-    DEBUG(DB_TRACE, printf("New secondary ray edge dist %.5f\n", new_edge_dist));
-
     return Ray(false, angle, new_pixel, new_edge, new_edge_dist, energy);
 }
 
-std::pair<double, double> Ray::_get_local_pixel_coordinates()
-{
-    double pixel_dist_x, pixel_dist_y;
-    if (m_current_edge == PIXEL_EDGE::TOP)
-    {
-        pixel_dist_x = m_current_edge_dist;
-        pixel_dist_y = 0;
-    }
-    else if (m_current_edge == PIXEL_EDGE::BOTTOM)
-    {
-        pixel_dist_x = m_current_edge_dist;
-        pixel_dist_y = 1;
-    }
-    else if (m_current_edge == PIXEL_EDGE::LEFT)
-    {
-        pixel_dist_x = 0;
-        pixel_dist_y = m_current_edge_dist;
-    }
-    else // if (m_current_edge == PIXEL_EDGE::RIGHT)
-    {
-        pixel_dist_x = 1;
-        pixel_dist_y = m_current_edge_dist;
-    }
+bool Ray::is_primary() { return m_primary; }
 
-    std::pair<double, double> result(pixel_dist_x, pixel_dist_y);
-    return result;
+bool Ray::is_active() { return m_active; }
+
+void Ray::deactivate()
+{
+    m_active = false;
+    return;
+}
+
+PIXEL Ray::get_current_pixel() { return m_current_pixel; }
+
+double Ray::get_current_energy() { return m_current_energy; }
+
+void Ray::set_current_energy(double new_energy)
+{
+    m_current_energy = new_energy;
+    return;
 }
 
 /*  Extended tracing description:
@@ -119,7 +112,7 @@ std::pair<double, double> Ray::_get_local_pixel_coordinates()
  *  nor are those that travel perfectly vertically or horizontally.
  *  With randomized rays, these cases will never occur in practice.
  */
-std::pair<double, PIXEL> Ray::trace()
+std::pair<PIXEL, double> Ray::trace()
 {
 
     // Get local coordinates of ray origin position
@@ -127,6 +120,11 @@ std::pair<double, PIXEL> Ray::trace()
     std::pair<double, double> local_coords = _get_local_pixel_coordinates();
     double pixel_dist_x = local_coords.first;
     double pixel_dist_y = local_coords.second;
+
+    DEBUG(DB_TRACE, std::cout << "Beginning trace, ray is on " << _get_edge_name(m_current_edge) << " edge of pixel "
+                              << m_current_pixel.first << "," << m_current_pixel.second << std::endl);
+    DEBUG(DB_TRACE, std::cout << "x,y distance from top left of current pixel is " << pixel_dist_x << ","
+                              << pixel_dist_y << std::endl);
 
     // Variables numbered with 1 are for case of moving to an adjacent horizontal pixel
     // Variables numbered with 2 are for case of moving to an adjacent vertical pixel
@@ -153,7 +151,7 @@ std::pair<double, PIXEL> Ray::trace()
         alpha = m_angle;
         dir_vert = 1;
         dir_horiz = 1;
-        DEBUG(DB_TRACE, printf("Going SE. angle, alpha: %.5f %.5f\n", m_angle, alpha));
+        DEBUG(DB_TRACE, std::cout << "Going SE with angle " << m_angle << std::endl);
     }
     else if (m_angle < M_PI) // going NE
     {
@@ -164,11 +162,10 @@ std::pair<double, PIXEL> Ray::trace()
         alpha = M_PI - m_angle;
         dir_vert = -1;
         dir_horiz = 1;
-        DEBUG(DB_TRACE, printf("Going NE. angle, alpha: %.5f %.5f\n", m_angle, alpha));
+        DEBUG(DB_TRACE, std::cout << "Going NE with angle " << m_angle << std::endl);
     }
     else if (m_angle < 3 * M_PI / 2) // going NW
     {
-        DEBUG(DB_TRACE, std::cout << "Going NW but edge is: " << _get_edge_name(m_current_edge) << std::endl);
         // If in this quadrant and not on the correct edge, something went wrong
         assert(m_current_edge == PIXEL_EDGE::BOTTOM || m_current_edge == PIXEL_EDGE::RIGHT);
         candidate1 = PIXEL_EDGE::LEFT;
@@ -176,9 +173,9 @@ std::pair<double, PIXEL> Ray::trace()
         alpha = m_angle - M_PI;
         dir_vert = -1;
         dir_horiz = -1;
-        DEBUG(DB_TRACE, printf("Going NW. angle, alpha: %.5f %.5f\n", m_angle, alpha));
+        DEBUG(DB_TRACE, std::cout << "Going NW with angle " << m_angle << std::endl);
     }
-    else // if (m_angle < 2 * M_PI) // going SW
+    else // going SW
     {
         // If in this quadrant and not on the correct edge, something went wrong
         assert(m_current_edge == PIXEL_EDGE::TOP || m_current_edge == PIXEL_EDGE::RIGHT);
@@ -187,12 +184,8 @@ std::pair<double, PIXEL> Ray::trace()
         alpha = 2 * M_PI - m_angle;
         dir_vert = 1;
         dir_horiz = -1;
-        DEBUG(DB_TRACE, printf("Going SW. angle, alpha: %.5f %.5f\n", m_angle, alpha));
+        DEBUG(DB_TRACE, std::cout << "Going SW with angle " << m_angle << std::endl);
     }
-    // else
-    // {
-    //     std::cout << "unexpected angle to trace" << std::endl;
-    // }
 
     // Determine known side lengths of candidate triangles
     if (candidate1 == PIXEL_EDGE::LEFT)
@@ -225,17 +218,13 @@ std::pair<double, PIXEL> Ray::trace()
     PIXEL_EDGE new_edge;
     double new_edge_dist;
 
-    DEBUG(DB_TRACE, printf("pixel_dist_x: %.5f\n", pixel_dist_x));
-    DEBUG(DB_TRACE, printf("pixel_dist_y: %.5f\n", pixel_dist_y));
-    DEBUG(DB_TRACE, printf("old edge distance: %.5f\n", m_current_edge_dist));
-
     int delta_x = 0; // horizontal pixel adjustment
     int delta_y = 0; // vertical pixel adjustment
     if (c1 < c2)
     {
         // Candidate 1: Traveled horizontally
         dist_traveled = c1;
-        DEBUG(DB_TRACE, printf("a1, b1: %.5f %.5f\n", a1, b1));
+
         if (candidate1 == PIXEL_EDGE::LEFT)
         {
             // Travel to the left pixel
@@ -254,7 +243,7 @@ std::pair<double, PIXEL> Ray::trace()
     {
         // Candidate 2: Travelled vertically
         dist_traveled = c2;
-        DEBUG(DB_TRACE, printf("a2, b2: %.5f %.5f\n", a2, b2));
+
         if (candidate2 == PIXEL_EDGE::TOP)
         {
             // Travel to the top pixel
@@ -270,21 +259,47 @@ std::pair<double, PIXEL> Ray::trace()
         new_edge_dist = pixel_dist_x + dir_horiz * a2;
     }
 
-    DEBUG(DB_TRACE, printf("new_edge_dist: %.5f\n", new_edge_dist));
     // Edge distance must be well-defined
     assert(new_edge_dist > 0 && new_edge_dist <= 1);
 
-    // Update ray
-    DEBUG(DB_TRACE, printf("delta x, y: %d %d\n", delta_x, delta_y));
-
     PIXEL new_pixel(m_current_pixel.first + delta_x, m_current_pixel.second + delta_y);
+    DEBUG(DB_TRACE, std::cout << "Moving to " << _get_edge_name(new_edge) << " edge of pixel " << new_pixel.first << ","
+                              << new_pixel.second << ", new edge dist is " << new_edge_dist << std::endl);
     m_current_pixel = new_pixel;
     m_current_edge = new_edge;
     m_current_edge_dist = new_edge_dist;
 
-    DEBUG(DB_TRACE, printf("Traveled: %.5f\n", dist_traveled));
     // All done
-    std::pair<double, PIXEL> result(dist_traveled, old_pixel);
+    DEBUG(DB_TRACE, std::cout << "Done" << std::endl << std::endl);
+    std::pair<PIXEL, double> result(old_pixel, dist_traveled);
+    return result;
+}
+
+std::pair<double, double> Ray::_get_local_pixel_coordinates()
+{
+    double pixel_dist_x, pixel_dist_y;
+    if (m_current_edge == PIXEL_EDGE::TOP)
+    {
+        pixel_dist_x = m_current_edge_dist;
+        pixel_dist_y = 0;
+    }
+    else if (m_current_edge == PIXEL_EDGE::BOTTOM)
+    {
+        pixel_dist_x = m_current_edge_dist;
+        pixel_dist_y = 1;
+    }
+    else if (m_current_edge == PIXEL_EDGE::LEFT)
+    {
+        pixel_dist_x = 0;
+        pixel_dist_y = m_current_edge_dist;
+    }
+    else // if (m_current_edge == PIXEL_EDGE::RIGHT)
+    {
+        pixel_dist_x = 1;
+        pixel_dist_y = m_current_edge_dist;
+    }
+
+    std::pair<double, double> result(pixel_dist_x, pixel_dist_y);
     return result;
 }
 
@@ -307,22 +322,4 @@ std::string Ray::_get_edge_name(PIXEL_EDGE edge)
         return "left";
     }
 }
-
-// Ray::~Ray() { DEBUG(DB_TRACE, "Ray is getting deleted"); }
-
-void Ray::deactivate() { m_active = false; }
-
-bool Ray::is_active() { return m_active; }
-
-PIXEL Ray::get_current_pixel() { return m_current_pixel; }
-
-double Ray::get_current_energy() { return m_current_energy; }
-
-void Ray::set_current_energy(double new_energy) { m_current_energy = new_energy; }
-
-bool Ray::is_primary() { return m_primary; }
-
-PIXEL_EDGE Ray::get_current_edge() { return m_current_edge; }
-
-double Ray::get_current_edge_dist() { return m_current_edge_dist; }
 

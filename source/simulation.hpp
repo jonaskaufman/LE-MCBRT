@@ -15,13 +15,13 @@
 #include <utility>
 #include <vector>
 
-class SimulationSerial
+class Simulation
 {
 public:
-    SimulationSerial() = delete;
+    Simulation() = delete;
 
     /// Constructor
-    SimulationSerial(const int N);
+    Simulation(const int N);
 
     /// Initialize densities randomly between 0 and 1
     void initialize_densities_random();
@@ -33,12 +33,12 @@ public:
     //  with spread (std dev) given as fraction of grid size
     void initialize_densities_centered_gaussian(const double max_density, const double spread);
 
-    /// Initialize densities with multiple Gaussians at random positions
-    //  Result is normalized to given max_density
+    /// Initialize densities with multiple Gaussians at random positions,
+    //  with highest resulting density normalized to given max_density
     void initialize_densities_random_gaussians(const int n_gaussians, const double max_density, const double spread);
 
-    /// Run simulation for a given number of primary rays
-    void run(const int num_primary_rays);
+    /// Run simulation for a given number of primary rays, in serial
+    void run_serial(const int num_primary_rays);
 
     /// Write data
     void write_densities_to_file(const std::string& filename);
