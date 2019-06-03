@@ -1,4 +1,5 @@
 #include "ray.hpp"
+#include <assert.h>
 
 Ray::Ray(const bool& primary,
          const double& angle,
