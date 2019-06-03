@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH -p gpu-shared
+#SBATCH --gres=gpu:p100:1
+
+#SBATCH --job-name="simulation"
+#SBATCH --output="gpu_test%j.%N.out"
+#SBATCH -t 00:01:00
+
+#cd ~/Working_directory
+./simulation.x
