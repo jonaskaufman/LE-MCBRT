@@ -1,12 +1,12 @@
 #include "ray.hpp"
 #include <assert.h>
 
-Ray::Ray(const bool& primary,
-         const double& angle,
-         const PIXEL& pixel,
-         const PIXEL_EDGE& edge,
-         const double& edge_dist,
-         const double& energy)
+CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
+                              const double& angle,
+                              const PIXEL& pixel,
+                              const PIXEL_EDGE& edge,
+                              const double& edge_dist,
+                              const double& energy)
     : m_active(true),
       m_primary(primary),
       m_angle(angle),
@@ -17,12 +17,15 @@ Ray::Ray(const bool& primary,
 {
 }
 
-Ray Ray::primary(const double angle, PIXEL spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist)
+CUDA_CALLABLE_MEMBER Ray Ray::primary(const double angle,
+                                      PIXEL spawn_pixel,
+                                      PIXEL_EDGE spawn_edge,
+                                      double spawn_edge_dist)
 {
     return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, PARAM_E0);
 }
 
-Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
+CUDA_CALLABLE_MEMBER Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
 {
     DEBUG(DB_INIT_SEC, std::cout << "New secondary ray spawning from center of pixel " << spawn_pixel.first << ","
                                  << spawn_pixel.second << " with angle " << angle << " and energy " << energy
@@ -73,21 +76,21 @@ Ray Ray::secondary_from_center(double angle, PIXEL spawn_pixel, double energy)
     return Ray(false, angle, new_pixel, new_edge, new_edge_dist, energy);
 }
 
-bool Ray::is_primary() { return m_primary; }
+CUDA_CALLABLE_MEMBER bool Ray::is_primary() { return m_primary; }
 
-bool Ray::is_active() { return m_active; }
+CUDA_CALLABLE_MEMBER bool Ray::is_active() { return m_active; }
 
-void Ray::deactivate()
+CUDA_CALLABLE_MEMBER void Ray::deactivate()
 {
     m_active = false;
     return;
 }
 
-PIXEL Ray::get_current_pixel() { return m_current_pixel; }
+CUDA_CALLABLE_MEMBER PIXEL Ray::get_current_pixel() { return m_current_pixel; }
 
-double Ray::get_current_energy() { return m_current_energy; }
+CUDA_CALLABLE_MEMBER double Ray::get_current_energy() { return m_current_energy; }
 
-void Ray::set_current_energy(double new_energy)
+CUDA_CALLABLE_MEMBER void Ray::set_current_energy(double new_energy)
 {
     m_current_energy = new_energy;
     return;
@@ -113,7 +116,7 @@ void Ray::set_current_energy(double new_energy)
  *  nor are those that travel perfectly vertically or horizontally.
  *  With randomized rays, these cases will never occur in practice.
  */
-std::pair<PIXEL, double> Ray::trace()
+CUDA_CALLABLE_MEMBER std::pair<PIXEL, double> Ray::trace()
 {
 
     // Get local coordinates of ray origin position

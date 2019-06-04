@@ -16,8 +16,8 @@ def colorbar(mappable):
     return fig.colorbar(mappable, cax=cax)
 
 # Specify data paths
-densities_path="../source/densities.csv"
-doses_path="../source/doses.csv"
+densities_path="densities.csv"
+doses_path="doses.csv"
 
 # Load data
 densities = np.loadtxt(densities_path, delimiter=',')

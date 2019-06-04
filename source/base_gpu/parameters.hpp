@@ -37,7 +37,7 @@ enum class PIXEL_EDGE
     }
 
 /* Debug codes */
-#define CUR_DEBUG DB_ALL
+#define CUR_DEBUG DB_GPU
 
 #define DB_ALL -1
 #define DB_NONE 0
