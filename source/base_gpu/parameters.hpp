@@ -5,11 +5,11 @@
 #define PARAM_D 1.0     /// source distance as relative to grid size
 #define PARAM_MEAN 0.0  /// source angle mean
 #define PARAM_SIGMA 0.1 /// source angle std dev in radians
-#define PARAM_E0 1000.0 /// initial primary ray energy
+#define PARAM_E0 100.0  /// initial primary ray energy
 #define PARAM_A 2.0     /// primary ray interaction probability scaling
-#define PARAM_F 0.25    /// primary ray interaction energy deposit fraction
+#define PARAM_F 0.05    /// primary ray interaction energy deposit fraction
 #define PARAM_G 1.0     /// secondary ray deposition constant
-#define PARAM_KS 20     /// number of secondary rays to spawn after interaction
+#define PARAM_KS 10     /// number of secondary rays to spawn after interaction
 #define PARAM_MINERGY                                                                                                  \
     0.000000001 /// minimum energy a secondary ray can have before dying
                 /// useful to avoid comparing to 0 which can cause error

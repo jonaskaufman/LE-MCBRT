@@ -155,6 +155,8 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
     // Randomly select source angle from normal distribution
     double source_angle = random_source_angle(true);
 
+    printf("block %d, thread %d spawning primary ray with angle %0.5f\n", blockIdx.x, threadIdx.x, source_angle);
+
     // Calculate initial ray position
     double horiz_dist_from_center = PARAM_D * N * tan(source_angle); // horizontal distance from center of top edge
     int middle_pixel = N / 2;
@@ -234,8 +236,10 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
 
     // Remove energy from ray and add it to pixel dose
     ray->set_current_energy(current_ray_energy - energy_to_transfer);
+    printf("Attempting to transfer %0.6f energy\n", energy_to_transfer);
+    printf("Pixel energy before transfer: %0.6f\n", doses[i * N + j]);
     doses[i * N + j] += energy_to_transfer;
-
+    printf("Pixel energy after transfer: %0.6f\n", doses[i * N + j]);
     return;
 }
 
@@ -264,10 +268,13 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
                 //                                               << std::endl);
                 if (random_interact(visited_pixel, travel_distance, densities, N))
                 {
+                    printf("block %d, thread %d primary ray interacted at pixel %d,%d\n", blockIdx.x, threadIdx.x,
+                           visited_pixel.first, visited_pixel.second);
                     // DEBUG(DBevolve_PRI, std::cout << "Primary ray " << i << " interacted" << std::endl);
                     // Deposit energy to pixel
                     // DEBUG(DBevolve_PRI, std::cout << "Depositing energy to pixel" << std::endl);
                     // DEBUG(DBevolve_PRI, std::cout << "Starting energy " << r->get_current_energy() << std::endl);
+                    printf("distance traveled %0.6f\n", travel_distance);
                     double energy_to_deposit = PARAM_F * travel_distance * r->get_current_energy();
                     transfer_energy(r, visited_pixel, energy_to_deposit, densities, doses, N);
                     // DEBUG(DBevolve_PRI, std::cout << "Energy after deposit " << r->get_current_energy() <<
@@ -368,8 +375,9 @@ int main(void)
     cudaMallocManaged(&densities, N * N * sizeof(double));
     cudaMallocManaged(&doses, N * N * sizeof(double));
 
-    DEBUG(DB_GPU, std::cout << "Initializing random densities" << std::endl);
-    initialize_densities_random(densities, N);
+    DEBUG(DB_GPU, std::cout << "Initializing densities" << std::endl);
+    // initialize_densities_random(densities, N);
+    initialize_densities_constant(densities, N, 0.5);
 
     DEBUG(DB_GPU, std::cout << "Initializing doses to zero" << std::endl);
     initialize_doses(doses, N);
@@ -377,11 +385,11 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Writing densities" << std::endl);
     write_to_csv_file(densities, N, "densities.csv");
 
-    int grid_size = 3;
+    int grid_size = 100;
     int block_size = 1;
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-    int primary_rays_per_thread = 100;
+    int primary_rays_per_thread = 1; // one ray per thread for now
     run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
 
     DEBUG(DB_GPU, std::cout << "Writing doses" << std::endl);
