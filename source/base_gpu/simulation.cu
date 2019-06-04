@@ -91,27 +91,45 @@ __host__ void write_to_csv_file(double* grid_data, int N, const std::string& fil
     return;
 }
 
+__device__ void init_curand_state(curandState_t* state)
+{
+    // Initialize random kernel
+    int tId = threadIdx.x + (blockIdx.x * blockDim.x);
+    curand_init((unsigned long long)clock(), tId, 0, state);
+    return; 
+}
+
+__device__ double uniform_angle_dist(curandState_t* state) { return 2 * M_PI * curand_uniform_double(state); }
+
+__device__ double normal_dist(curandState_t* state, double mean, double std_dev)
+{
+    return mean + std_dev * curand_normal_double(state);
+}
 __device__ double random_source_angle(bool normal)
 {
+    curandState state;
+    init_curand_state(&state);
+
+    double angle;
     if (normal)
     { // Normal distribution
-        double angle = normal_dist(random_engine);
-
-        // Normalize angle
-        if (angle < 0)
-        {
-            angle += 2 * M_PI;
-        }
-        else if (angle >= 2 * M_PI)
-        {
-            angle -= 2 * M_PI;
-        }
-        return angle;
+        angle = normal_dist(&state, PARAM_MEAN, PARAM_SIGMA);
     }
     else
     { // Uniform distribution between 0 and 2 pi
-        return uniform_angle_dist(random_engine);
+        angle = uniform_angle_dist(&state);
     }
+
+    // Normalize angle
+    if (angle < 0)
+    {
+        angle += 2 * M_PI;
+    }
+    else if (angle >= 2 * M_PI)
+    {
+        angle -= 2 * M_PI;
+    }
+    return angle;
 }
 
 __device__ bool out_of_bounds(PIXEL current_pixel, int N)
@@ -182,7 +200,10 @@ __device__ bool random_interact(PIXEL target_pixel, double distance, double* den
     double density = densities[i * N + j];
     double l_ep = density * distance; // effective path length travelled in pixel
     double probability = std::exp(-PARAM_A / l_ep);
-    double rand = uniform_dist(random_engine);
+
+    curandState state;
+    init_curand_state(&state);
+    double rand = curand_uniform_double(&state); 
     return (rand < probability);
 }
 

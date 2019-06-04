@@ -4,7 +4,7 @@ CC = nvcc
 #	module load cuda
 	
 all: ray.o simulation.cu
-	$(CC) -arch=compute_20 -std=c++11 ray.o -o simulation.x simulation.cu
+	$(CC) -arch=compute_20 -std=c++11 -lcurand ray.o -o simulation.x simulation.cu
 
 ray.o: ray.cpp
 	$(CC) -std=c++11 -c ray.cpp

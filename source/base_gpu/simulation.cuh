@@ -17,7 +17,7 @@
 #include <vector>
 
 #include <curand.h>
-// TODO change random number gen to curand
+#include <curand_kernel.h>
 
 // TODO I made N a function argument for now, but we could just define it globally
 // Passing it along is a little annoying I suppose
@@ -53,8 +53,12 @@ __host__ void write_to_csv_file(double* grid_data, int N, const std::string& fil
 /// Random distributions
 std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
 std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound, upperbound}
-std::uniform_real_distribution<double> uniform_angle_dist{0.0, 2 * M_PI}; // uniform distributioin between 0 and 2 pi
-std::normal_distribution<double> normal_dist{PARAM_MEAN, PARAM_SIGMA};    // normal distribribution, pass {mean, stddev}
+
+__device__ void init_curand_state(curandState_t* state); // initialize curand state based on clock, thread id
+
+__device__ double uniform_angle_dist(curandState_t* state); // uniform between 0 and 2 pi
+
+__device__ double normal_dist(curandState_t* state, double mean, double std_dev); // normal with given mean and std dev
 
 /// Randomly sample source angle for primary rays
 __device__ double random_source_angle(bool normal);
