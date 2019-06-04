@@ -32,6 +32,9 @@ struct RayGroup
     int my_size;  // number of rays in array
 };
 
+/// Initialize doses (to zero)
+__host__ void initialize_doses(double* doses, int N);
+
 /// Initialize densities randomly between 0 and 1
 __host__ void initialize_densities_random(double* densities, int N);
 
@@ -64,21 +67,21 @@ __device__ double normal_dist(curandState_t* state, double mean, double std_dev)
 __device__ double random_source_angle(bool normal);
 
 /// Check if a given pixel lies outside the bounds of the grid
-__device__ bool out_of_bounds(PIXEL current_pixel, int N);
+__device__ bool out_of_bounds(Pixel current_pixel, int N);
 
 /// Generate new primary ray from source
 __device__ void spawn_primary_ray(RayGroup* group, int N);
 
 /// Generate secondary rays from interaction point
-__device__ void spawn_secondary_rays(RayGroup* group, PIXEL spawn_pixel, double total_energy, int N);
+__device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N);
 
 /// Determine whether primary ray interacts at visited pixel based on distance travelled
-__device__ bool random_interact(PIXEL target_pixel, double distance, double* densities, int N);
+__device__ bool random_interact(Pixel target_pixel, double distance, double* densities, int N);
 
 /// Transfer energy from ray to target pixel,
 //  where the actual energy transferred is scaled by the pixel density
 __device__ void
-transfer_energy(Ray* ray, PIXEL target_pixel, double unscaled_energy, double* densities, double* doses, int N);
+transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N);
 
 /// Evolve all active rays by one step, return the number of rays evolved
 __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N);

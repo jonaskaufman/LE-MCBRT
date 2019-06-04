@@ -1,6 +1,18 @@
 #include "simulation.cuh"
 #include <stdio.h>
 
+__host__ void initialize_doses(double* doses, int N)
+{
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+            doses[i * N + j] = 0;
+        }
+    }
+    return;
+}
+
 __host__ void initialize_densities_random(double* densities, int N)
 {
     for (int i = 0; i < N; i++)
@@ -96,7 +108,7 @@ __device__ void init_curand_state(curandState_t* state)
     // Initialize random kernel
     int tId = threadIdx.x + (blockIdx.x * blockDim.x);
     curand_init((unsigned long long)clock(), tId, 0, state);
-    return; 
+    return;
 }
 
 __device__ double uniform_angle_dist(curandState_t* state) { return 2 * M_PI * curand_uniform_double(state); }
@@ -132,7 +144,7 @@ __device__ double random_source_angle(bool normal)
     return angle;
 }
 
-__device__ bool out_of_bounds(PIXEL current_pixel, int N)
+__device__ bool out_of_bounds(Pixel current_pixel, int N)
 {
     return (current_pixel.first < 0 || current_pixel.first >= N || current_pixel.second < 0 ||
             current_pixel.second >= N);
@@ -157,9 +169,11 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
     else
     {
         double horiz_dist_from_left_rounded = floor(horiz_dist_from_left);
-        PIXEL pixel(horiz_dist_from_left_rounded, 0); // always starts from top of grid
+        Pixel spawn_pixel;
+        spawn_pixel.first = horiz_dist_from_left_rounded;
+        spawn_pixel.second = 0; // always starts from top of grid
         double edge_dist = horiz_dist_from_left - horiz_dist_from_left_rounded;
-        group->my_rays[group->my_size] = Ray::primary(source_angle, pixel, PIXEL_EDGE::TOP, edge_dist);
+        group->my_rays[group->my_size] = Ray::primary(source_angle, spawn_pixel, PIXEL_EDGE::TOP, edge_dist);
         group->my_size++;
         // DEBUG(DB_INIT_PRI, std::cout << "New primary ray added at pixel " << pixel.first << "," << pixel.second
         //                                     << " with angle " << source_angle << std::endl);
@@ -167,7 +181,7 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
     return;
 }
 
-__device__ void spawn_secondary_rays(RayGroup* group, PIXEL spawn_pixel, double total_energy, int N)
+__device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N)
 {
     // DEBUG(DB_INIT_SEC, std::cout << "Spawning " << PARAM_KS << " secondary rays from pixel " << spawn_pixel.first <<
     // ","
@@ -177,7 +191,7 @@ __device__ void spawn_secondary_rays(RayGroup* group, PIXEL spawn_pixel, double 
         double source_angle = random_source_angle(false); // uniform random source angle
         double partial_energy = total_energy / PARAM_KS;
         Ray new_ray = Ray::secondary_from_center(source_angle, spawn_pixel, partial_energy);
-        PIXEL current_pixel = new_ray.get_current_pixel();
+        Pixel current_pixel = new_ray.get_current_pixel();
         if (out_of_bounds(current_pixel, N))
         {
             // DEBUG(DB_INIT_SEC, std::cout << "Ray is out of bounds, not adding" << std::endl);
@@ -194,7 +208,7 @@ __device__ void spawn_secondary_rays(RayGroup* group, PIXEL spawn_pixel, double 
     return;
 }
 
-__device__ bool random_interact(PIXEL target_pixel, double distance, double* densities, int N)
+__device__ bool random_interact(Pixel target_pixel, double distance, double* densities, int N)
 {
     int i = target_pixel.first, j = target_pixel.second;
     double density = densities[i * N + j];
@@ -203,12 +217,12 @@ __device__ bool random_interact(PIXEL target_pixel, double distance, double* den
 
     curandState state;
     init_curand_state(&state);
-    double rand = curand_uniform_double(&state); 
+    double rand = curand_uniform_double(&state);
     return (rand < probability);
 }
 
 __device__ void
-transfer_energy(Ray* ray, PIXEL target_pixel, double unscaled_energy, double* densities, double* doses, int N)
+transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N)
 {
     int i = target_pixel.first, j = target_pixel.second;
     double density = densities[i * N + j];
@@ -225,7 +239,7 @@ transfer_energy(Ray* ray, PIXEL target_pixel, double unscaled_energy, double* de
     return;
 }
 
-__device__ int evolve_rays(RayGroup* group, int num_rays, double* densities, double* doses, int N)
+__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N)
 {
     int rays_evolved = 0;
 
@@ -237,9 +251,9 @@ __device__ int evolve_rays(RayGroup* group, int num_rays, double* densities, dou
         {
             // Trace ray
             // DEBUG(DB_TRACE, std::cout << "Tracing ray " << i << std::endl);
-            std::pair<PIXEL, double> rtrace = r->trace();
-            PIXEL visited_pixel = rtrace.first;
-            double travel_distance = rtrace.second; // distance traveled in visited pixel
+            TraceHistory rtrace = r->trace();
+            Pixel visited_pixel = rtrace.visited;
+            double travel_distance = rtrace.distance; // distance traveled in visited pixel
             rays_evolved++;
 
             if (r->is_primary()) // primary ray
@@ -314,6 +328,7 @@ __device__ void run_serial(int num_primary_rays, double* densities, double* dose
     // Each primary ray is done serially as its own individual ray group
     for (int i = 0; i < num_primary_rays; i++)
     {
+        printf("Hello from block %d, thread %d. I'm running primary ray %d\n", blockIdx.x, threadIdx.x, i);
         // Just running one primary ray (and its secondaries) at a time for now
         // TODO: might want to change how memory allocation/reallocation is done
         RayGroup primary_ray_group;
@@ -331,20 +346,16 @@ __device__ void run_serial(int num_primary_rays, double* densities, double* dose
         // DEBUG(DB_GENERAL, std::cout << "Done" << std::endl);
         free(primary_ray_group.my_rays);
     }
-
     return;
 }
 
 /// Kernel function for base-GPU
 __global__ void run_rays(int num_primary_rays, double* densities, double* doses, int N)
 {
-    printf("Hello from block %d, thread %d. I'm supposed to run %d primary rays.\n", blockIdx.x, threadIdx.x,
-           num_primary_rays);
-
-    //    run_serial(num_primary_rays, densities, doses, N);
+    run_serial(num_primary_rays, densities, doses, N);
 }
 
-// Need cudaFree somewhere?
+// TODO could actually make N a command line argument, right?
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
@@ -360,16 +371,18 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Initializing random densities" << std::endl);
     initialize_densities_random(densities, N);
 
+    DEBUG(DB_GPU, std::cout << "Initializing doses to zero" << std::endl);
+    initialize_doses(doses, N);
+
     DEBUG(DB_GPU, std::cout << "Writing densities" << std::endl);
     write_to_csv_file(densities, N, "densities.csv");
-    /*
-        int grid_size = 2;
-        int block_size = 1;
 
-        DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-        int primary_rays_per_thread = 1;
-        run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N)
-    */
+    int grid_size = 3;
+    int block_size = 1;
+
+    DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
+    int primary_rays_per_thread = 100;
+    run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
 
     DEBUG(DB_GPU, std::cout << "Writing doses" << std::endl);
     write_to_csv_file(doses, N, "doses.csv");

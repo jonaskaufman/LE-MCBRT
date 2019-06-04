@@ -1,13 +1,13 @@
-CC = nvcc
-
 # load cuda in the shell prompt
-#	module load cuda
-	
-all: ray.o simulation.cu
-	$(CC) -arch=compute_20 -std=c++11 -lcurand ray.o -o simulation.x simulation.cu
+#	module load cuda 
 
-ray.o: ray.cpp
-	$(CC) -std=c++11 -c ray.cpp
+objects = simulation.o ray.o
+
+all: $(objects)
+	nvcc -arch=sm_30 $(objects) -o simulation.x
+
+%.o : %.cu
+	nvcc -std=c++11 -lcurand -x cu -arch=sm_30 -I. -dc $< -o $@	
 
 clean:
-	rm -f *.o *.x
+	rm -f *.o *.x *.csv
