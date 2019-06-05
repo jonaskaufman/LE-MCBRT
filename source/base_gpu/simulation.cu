@@ -366,7 +366,7 @@ __global__ void run_rays(int num_primary_rays, double* densities, double* doses,
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
-    int N = 100; // grid size in pixels per side
+    int N = 1000; // grid size in pixels per side
 
     // Storing the N by N grid data as 1D arrays of length N*N
     // such that element i,j is at index i * N + j
@@ -377,7 +377,7 @@ int main(void)
 
     DEBUG(DB_GPU, std::cout << "Initializing densities" << std::endl);
     // initialize_densities_random(densities, N);
-    initialize_densities_constant(densities, N, 0.5);
+    initialize_densities_constant(densities, N, 0.3);
 
     DEBUG(DB_GPU, std::cout << "Initializing doses to zero" << std::endl);
     initialize_doses(doses, N);
@@ -385,12 +385,15 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Writing densities" << std::endl);
     write_to_csv_file(densities, N, "densities.csv");
 
-    int grid_size = 100;
-    int block_size = 1;
+    int grid_size = 1000; // number of thread blocks
+    int block_size = 1;   // TODO 1 thread per block, does this make sense?
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-    int primary_rays_per_thread = 1; // one ray per thread for now
+    int primary_rays_per_thread = 1; // each thread does this many rays in serial
     run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
+
+    // Wait for GPU computation to finish
+    cudaDeviceSynchronize();
 
     DEBUG(DB_GPU, std::cout << "Writing doses" << std::endl);
     write_to_csv_file(doses, N, "doses.csv");
