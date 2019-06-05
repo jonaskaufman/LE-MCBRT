@@ -108,6 +108,7 @@ __device__ void init_curand_state(curandState_t* state)
     // Initialize random kernel
     int tId = threadIdx.x + (blockIdx.x * blockDim.x);
     curand_init((unsigned long long)clock(), tId, 0, state);
+    //printf("myID: %d\n", tId);
     return;
 }
 
@@ -236,10 +237,10 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
 
     // Remove energy from ray and add it to pixel dose
     ray->set_current_energy(current_ray_energy - energy_to_transfer);
-    printf("Attempting to transfer %0.6f energy\n", energy_to_transfer);
-    printf("Pixel energy before transfer: %0.6f\n", doses[i * N + j]);
+    //printf("Attempting to transfer %0.6f energy\n", energy_to_transfer);
+    //printf("Pixel energy before transfer: %0.6f\n", doses[i * N + j]);
     doses[i * N + j] += energy_to_transfer;
-    printf("Pixel energy after transfer: %0.6f\n", doses[i * N + j]);
+    //printf("Pixel energy after transfer: %0.6f\n", doses[i * N + j]);
     return;
 }
 
@@ -366,7 +367,7 @@ __global__ void run_rays(int num_primary_rays, double* densities, double* doses,
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
-    int N = 1000; // grid size in pixels per side
+    int N = 10000; // grid size in pixels per side
 
     // Storing the N by N grid data as 1D arrays of length N*N
     // such that element i,j is at index i * N + j
@@ -381,21 +382,25 @@ int main(void)
 
     DEBUG(DB_GPU, std::cout << "Initializing doses to zero" << std::endl);
     initialize_doses(doses, N);
-
+    size_t heap_limit = pow(2, 26); // default 8MB, this sets to 32 MB
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_limit);
+ 
     DEBUG(DB_GPU, std::cout << "Writing densities" << std::endl);
+    //write_to_csv_file(densities, N, "../../plot/densities.csv");
     write_to_csv_file(densities, N, "densities.csv");
-
-    int grid_size = 1000; // number of thread blocks
-    int block_size = 1;   // TODO 1 thread per block, does this make sense?
+    
+    int grid_size = 256; // number of thread blocks
+    int block_size = 128;   // TODO 1 thread per block, does this make sense?
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-    int primary_rays_per_thread = 1; // each thread does this many rays in serial
+    int primary_rays_per_thread = 32; // each thread does this many rays in serial
     run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
 
     // Wait for GPU computation to finish
     cudaDeviceSynchronize();
 
     DEBUG(DB_GPU, std::cout << "Writing doses" << std::endl);
+    //write_to_csv_file(doses, N, "../../plot/doses.csv");
     write_to_csv_file(doses, N, "doses.csv");
     DEBUG(DB_GPU, std::cout << "I'm the main function, look at me!" << std::endl);
 

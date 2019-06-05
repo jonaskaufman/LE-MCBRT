@@ -2,7 +2,7 @@
 #define SIMULATION_H
 
 #include "parameters.hpp"
-#include "ray.hpp"
+#include "ray.cuh"
 
 // TODO do we need to include all these?
 #include <chrono>
