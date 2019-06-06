@@ -6,6 +6,7 @@ CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
                               const Pixel& pixel,
                               const PIXEL_EDGE& edge,
                               const double& edge_dist,
+                              const Region& region,
                               const double& energy)
     : m_active(true),
       m_primary(primary),
@@ -13,16 +14,35 @@ CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
       m_current_pixel(pixel),
       m_current_edge(edge),
       m_current_edge_dist(edge_dist),
+      m_current_region(region),
       m_current_energy(energy)
 {
 }
 
+CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
+    const double& angle,
+    const Pixel& pixel,
+    const PIXEL_EDGE& edge,
+    const double& edge_dist,
+    const double& energy)
+: m_active(true),
+m_primary(primary),
+m_angle(angle),
+m_current_pixel(pixel),
+m_current_edge(edge),
+m_current_edge_dist(edge_dist),
+m_current_energy(energy)
+{
+}
+
+
 CUDA_CALLABLE_MEMBER Ray Ray::primary(const double angle,
                                       Pixel spawn_pixel,
                                       PIXEL_EDGE spawn_edge,
-                                      double spawn_edge_dist)
+                                      double spawn_edge_dist,
+                                      Region region)
 {
-    return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, PARAM_E0);
+    return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, region, PARAM_E0);
 }
 
 CUDA_CALLABLE_MEMBER Ray Ray::secondary_from_center(double angle, Pixel spawn_pixel, double energy)
@@ -91,6 +111,8 @@ CUDA_CALLABLE_MEMBER void Ray::deactivate()
 CUDA_CALLABLE_MEMBER Pixel Ray::get_current_pixel() { return m_current_pixel; }
 
 CUDA_CALLABLE_MEMBER double Ray::get_current_energy() { return m_current_energy; }
+
+CUDA_CALLABLE_MEMBER Region Ray::get_current_region() { return m_current_region; }
 
 CUDA_CALLABLE_MEMBER void Ray::set_current_energy(double new_energy)
 {

@@ -76,7 +76,7 @@ __host__ Pixel random_pixel();
 __device__ bool out_of_bounds(Pixel current_pixel, int N);
 
 /// Generate new primary ray from source
-__host__ void spawn_primary_rays(Ray* rays, int N, int num_primary_rays);
+__host__ void spawn_primary_rays(Ray* rays, int num_primary_rays, int N, int Rx, int Ry);
 
 /// Generate secondary rays from interaction point
 __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N);
@@ -97,5 +97,7 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 
 /// Run simulation for a given number  primary rays, in serial
 __device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N);
+
+Region get_region(Pixel position, int N, int Rx, int Ry);
 
 #endif

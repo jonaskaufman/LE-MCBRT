@@ -181,7 +181,7 @@ __device__ bool out_of_bounds(Pixel current_pixel, int N)
             current_pixel.second >= N);
 }
 
-__host__ void spawn_primary_rays(Ray* rays, int N, int num_primary_rays)
+__host__ void spawn_primary_rays(Ray* rays, int num_primary_rays, int N, int Rx, int Ry)
 {
     for (int i = 0; i < num_primary_rays; i++){
         // Randomly select source angle from normal distribution
@@ -189,11 +189,12 @@ __host__ void spawn_primary_rays(Ray* rays, int N, int num_primary_rays)
         Pixel position = random_pixel(N);
         PIXEL_EDGE edge = random_pixel_edge();
         double edge_dist = uniform_dist(random_engine);
-        rays[i] = Ray::primary(source_angle, position, edge, edge_dist);
+        Region region = get_region(position, N, Rx, Ry);
+        rays[i] = Ray::primary(source_angle, position, edge, edge_dist, region);
         
         std::string edge_name = Ray::get_edge_name(edge);
-        //std::cout << "edge: " << edge_name << std::endl;
-        printf("Primary: A: %.2f\tP: %d, %d\t E: %s\tED: %.2f\n", source_angle, position.first, position.second, edge_name.c_str(), edge_dist);
+
+        //printf("Primary: A: %.2f\tP: %d, %d\t E: %s\tED: %.2f\n", source_angle, position.first, position.second, edge_name.c_str(), edge_dist);
     }
     
     return;
@@ -382,8 +383,9 @@ __global__ void run_rays(int num_primary_rays, double* densities, double* doses,
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
-    int N = 2500; // grid size in pixels per side
-    int R = 12; // number of regions
+    int N = 100; // grid size in pixels per side
+    int Rx = 4, Ry = 5; // grid divides into Rx * Ry regions
+    int num_primary_rays = 100;
 
     // Storing the N by N grid data as 1D arrays of length N*N
     // such that element i,j is at index i * N + j
@@ -409,10 +411,18 @@ int main(void)
     int block_size = 128;   // TODO 1 thread per block, does this make sense?
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-    int primary_rays_per_thread = 32; // each thread does this many rays in serial
-    int num_primary_rays = 100;
+    
     Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
-    spawn_primary_rays(rays, N, num_primary_rays);
+    spawn_primary_rays(rays, num_primary_rays, N, Rx, Ry);
+    
+    for (int i = 0; i < num_primary_rays; i++){
+        Ray r = rays[i];
+        Pixel position = r.get_current_pixel();
+        Region region = r.get_current_region();
+        
+        printf("Primary %d: P: %d, %d\tR: %d, %d\n", i, position.first, position.second, region.first, region.second);
+    }
+    
     //run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
 
     // Wait for GPU computation to finish
@@ -427,5 +437,16 @@ int main(void)
     cudaFree(doses);
 
     return 0;
+}
+
+Region get_region(Pixel position, int N, int Rx, int Ry){
+    int px = position.first;
+    int py = position.second;
+    int size_x = floor((float) N / Rx);
+    int size_y = floor((float) N / Ry);
+    Region region;
+    region.first = floor((float) px / size_x);
+    region.second = floor((float) py / size_y);
+    return region;
 }
 
