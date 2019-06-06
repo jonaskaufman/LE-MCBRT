@@ -18,7 +18,7 @@ CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
       m_current_energy(energy)
 {
 }
-
+// TODO: Delete this
 CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
     const double& angle,
     const Pixel& pixel,

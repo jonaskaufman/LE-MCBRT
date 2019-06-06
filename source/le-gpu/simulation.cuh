@@ -30,6 +30,7 @@ struct RayGroup
 {
     Ray* my_rays; // pointer to beginning of array
     int my_size;  // number of rays in array
+    int max_size; // max number of rays allocated
 };
 
 /// Initialize doses (to zero)
@@ -44,6 +45,8 @@ __host__ void initialize_densities_constant(double* densities, int N, double den
 /// Initialize densities to 2D Gaussian centered on the grid,
 //  with spread (std dev) given as fraction of grid size
 __host__ void initialize_densities_centered_gaussian(double* densities, int N, double max_density, double spread);
+
+__host__ void initialize_ray_groups(RayGroup *groups);
 
 /// Initialize densities with multiple Gaussians at random positions,
 //  with highest resulting density normalized to given max_density
@@ -76,7 +79,7 @@ __host__ Pixel random_pixel();
 __device__ bool out_of_bounds(Pixel current_pixel, int N);
 
 /// Generate new primary ray from source
-__host__ void spawn_primary_rays(Ray* rays, int num_primary_rays, int N, int Rx, int Ry);
+__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int Rx, int Ry);
 
 /// Generate secondary rays from interaction point
 __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N);

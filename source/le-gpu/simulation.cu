@@ -87,6 +87,14 @@ initialize_densities_random_gaussians(double* densities, int N, int n_gaussians,
     return;
 }
 
+__host__ void initialize_ray_groups(RayGroup *groups, int R, int group_size){
+    for (int i = 0; i < R; i++){
+        groups[i].my_rays = (Ray *) malloc(group_size * sizeof(Ray));
+        groups[i].my_size = 0;
+        groups[i].max_size = group_size;
+    }
+}
+
 __host__ void write_to_csv_file(double* grid_data, int N, const std::string& filename)
 {
     std::ofstream output;
@@ -181,7 +189,7 @@ __device__ bool out_of_bounds(Pixel current_pixel, int N)
             current_pixel.second >= N);
 }
 
-__host__ void spawn_primary_rays(Ray* rays, int num_primary_rays, int N, int Rx, int Ry)
+__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int Rx, int Ry)
 {
     for (int i = 0; i < num_primary_rays; i++){
         // Randomly select source angle from normal distribution
@@ -190,11 +198,24 @@ __host__ void spawn_primary_rays(Ray* rays, int num_primary_rays, int N, int Rx,
         PIXEL_EDGE edge = random_pixel_edge();
         double edge_dist = uniform_dist(random_engine);
         Region region = get_region(position, N, Rx, Ry);
-        rays[i] = Ray::primary(source_angle, position, edge, edge_dist, region);
+        Ray r = Ray::primary(source_angle, position, edge, edge_dist, region);
+        int groups_index = region.second * Rx + region.first;
+        int max_index = groups[groups_index].max_size;
+        int rays_index = groups[groups_index].my_size + 1;
+
+        if (rays_index > max_index){
+            Ray *rays = groups[groups_index].my_rays;
+            groups[groups_index].my_rays = (Ray *) realloc(rays, max_index * 2 * sizeof(Ray));
+            groups[groups_index].max_size = max_index * 2;
+        }
+
+        groups[groups_index].my_rays[rays_index] = r;
+        groups[groups_index].my_size = rays_index;
         
         std::string edge_name = Ray::get_edge_name(edge);
 
-        //printf("Primary: A: %.2f\tP: %d, %d\t E: %s\tED: %.2f\n", source_angle, position.first, position.second, edge_name.c_str(), edge_dist);
+        printf("Primary: A: %.2f\tP: %d, %d\t E: %s\tED: %.2f\n", source_angle, position.first, position.second, edge_name.c_str(), edge_dist);
+        printf("Group: %d\t Region: %d, %d\n", groups_index, region.first, region.second);
     }
     
     return;
@@ -383,9 +404,10 @@ __global__ void run_rays(int num_primary_rays, double* densities, double* doses,
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
-    int N = 100; // grid size in pixels per side
-    int Rx = 4, Ry = 5; // grid divides into Rx * Ry regions
-    int num_primary_rays = 100;
+    int N = 36; // grid size in pixels per side
+    int Rx = 3, Ry = 4; // grid divided into Rx * Ry regions
+    int num_primary_rays = 100; // number of primary rays to be scattered across the grid
+    int rays_per_group = 10; // initial capacity of a ray group
 
     // Storing the N by N grid data as 1D arrays of length N*N
     // such that element i,j is at index i * N + j
@@ -411,16 +433,25 @@ int main(void)
     int block_size = 128;   // TODO 1 thread per block, does this make sense?
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
+    RayGroup *groups = (RayGroup *) malloc(Rx * Ry * sizeof(RayGroup));
+    initialize_ray_groups(groups, Rx * Ry, rays_per_group);
+    //Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
+    spawn_primary_rays(groups, num_primary_rays, N, Rx, Ry);
     
-    Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
-    spawn_primary_rays(rays, num_primary_rays, N, Rx, Ry);
-    
-    for (int i = 0; i < num_primary_rays; i++){
-        Ray r = rays[i];
-        Pixel position = r.get_current_pixel();
-        Region region = r.get_current_region();
+    int count = 0;
+    for (int i = 0; i < Rx * Ry; i++){
+        RayGroup cur_group = groups[i];
+        int cur_group_size = cur_group.my_size;
+        for (int j = 0; j < cur_group_size; j++){
+            Ray r = cur_group.my_rays[j];
+            Pixel position = r.get_current_pixel();
+            Region region = r.get_current_region();
+            printf("Primary %d: G: %d, P: %d, %d\tR: %d, %d\n", count, i, position.first, position.second, region.first, region.second);
+            count++;
+        }
         
-        printf("Primary %d: P: %d, %d\tR: %d, %d\n", i, position.first, position.second, region.first, region.second);
+        
+        
     }
     
     //run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);

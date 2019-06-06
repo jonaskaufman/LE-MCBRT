@@ -85,12 +85,13 @@ private:
         const Region& region,
         const double& energy);
 
-        CUDA_CALLABLE_MEMBER Ray(const bool& primary,
-            const double& angle,
-            const Pixel& pixel,
-            const PIXEL_EDGE& edge,
-            const double& edge_dist,
-            const double& energy);
+    // TODO: Delete this
+    CUDA_CALLABLE_MEMBER Ray(const bool& primary,
+        const double& angle,
+        const Pixel& pixel,
+        const PIXEL_EDGE& edge,
+        const double& edge_dist,
+        const double& energy);
 
 
     bool m_active;              /// whether ray is active
