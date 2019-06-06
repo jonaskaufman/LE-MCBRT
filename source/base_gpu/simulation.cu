@@ -134,11 +134,11 @@ __device__ double random_source_angle(bool normal)
     }
 
     // Normalize angle
-    if (angle < 0)
+    while (angle < 0)
     {
         angle += 2 * M_PI;
     }
-    else if (angle >= 2 * M_PI)
+    while (angle >= 2 * M_PI)
     {
         angle -= 2 * M_PI;
     }
