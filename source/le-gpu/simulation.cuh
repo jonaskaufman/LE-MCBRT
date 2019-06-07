@@ -106,14 +106,22 @@ __device__ void
 transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N);
 
 /// Evolve all active rays by one step, return the number of rays evolved
-__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N);
+__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N, int M);
 
 /// Evolve all rays until complete, i.e. none are active
-__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N);
+__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N, int M);
 
 /// Run simulation for a given number  primary rays, in serial
-__device__ void run_serial(RegionGroup *region_groups, double* densities, double* doses, int N, int M);
+__device__ void run_serial(RegionGroup *region_groups, Region cur_region, double* densities, double* doses, int N, int M);
 
+/// Return the region given a ray's current pixel
 Region get_region(Pixel position, int N, int M);
+
+/// Creates array of regions that is the order of regions to visit
+__host__ __device__ void build_schedule(Region *schedule, int N, int M, bool forward, bool lr_diag);
+
+/// For scheduling, return the next region to go to given the current region/group scheduled
+__host__ __device__ Region get_next_region(Region cur_region, int N, int M, bool forward, bool lr_diag);
+
 
 #endif

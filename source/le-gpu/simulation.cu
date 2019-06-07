@@ -298,7 +298,7 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
     return;
 }
 
-__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N)
+__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N, int M)
 {
     int rays_evolved = 0;
 
@@ -335,7 +335,7 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
                     // DEBUG(DBevolve_PRI, std::cout << "Energy after deposit " << r->get_current_energy() <<
                     // std::endl); DEBUG(DBevolve_PRI, std::cout << "Will spawn secondary rays next" << std::endl <<
                     // std::endl); Spawn secondary rays, transferring remaining energy to them
-                    spawn_secondary_rays(group, visited_pixel, r->get_current_energy(), N);
+                    ///////////////////////////spawn_secondary_rays(group, visited_pixel, r->get_current_energy(), N); // UNCOMMENT 
                     r->set_current_energy(0);
                 }
                 else
@@ -371,13 +371,13 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
     return rays_evolved;
 }
 
-__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N)
+__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N, int M)
 {
     int rays_evolved = group->my_size;
     //  int raysevolved = ray_group->size();
     while (rays_evolved > 0)
     {
-        rays_evolved = evolve_rays(group, densities, doses, N);
+        rays_evolved = evolve_rays(group, densities, doses, N, M);
         // DEBUG(DB_GENERAL, std::cout << raysevolved << " rays evolved" << std::endl);
         // DEBUG(DB_GENERAL, std::cout << (ray_group->size() - prev_num_rays) << " rays added" << std::endl <<
         // std::endl)
@@ -385,14 +385,14 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 
     return;
 }
-__device__ void run_serial(RegionGroup *region_groups, double* densities, double* doses, int N, int M)
+__device__ void run_serial(RegionGroup *region_groups, Region cur_region, double* densities, double* doses, int N, int M)
 {
     printf("Hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
     // Each primary ray is done serially as its own individual ray group
     
 
-    /// check to see if GPU received all the correct data. It does
-    
+    /// Sanity check to see if GPU received all the correct data. It does
+    /*
     int num_regions = pow(ceilf(N / M), 2); // number of regions
     printf("N: %d\tM: %d\tnum_regions: %d\n", N, M, num_regions);
     int count = 0;
@@ -410,36 +410,36 @@ __device__ void run_serial(RegionGroup *region_groups, double* densities, double
         }
     }
     return;
-    
-    /*
-    for (int i = 0; i < num_primary_rays; i++)
-    {
-        printf("Hello from block %d, thread %d. I'm running primary ray %d\n", blockIdx.x, threadIdx.x, i);
-        // Just running one primary ray (and its secondaries) at a time for now
-        // TODO: might want to change how memory allocation/reallocation is done
-        RayGroup primary_ray_group;
-        int max_num_rays = 1 + PARAM_KS; // at most one primary ray plus all secondaries
-        Ray* rays;
-        rays = (Ray*)malloc(max_num_rays * sizeof(Ray));
-        primary_ray_group.my_rays = rays;
-        primary_ray_group.my_size = 0;
-
-        // DEBUG(DB_INIT_PRI, std::cout << "Spawning " << num_primary_rays << " primary rays..." << std::endl);
-        //spawn_primary_ray(&primary_ray_group, N);
-        // DEBUG(DB_INIT_PRI, std::cout << "Done, " << ray_group.size() << " rays added" << std::endl << std::endl);
-        // DEBUG(DB_GENERAL, std::cout << "Evolving rays..." << std::endl)
-        evolve_to_completion(&primary_ray_group, densities, doses, N);
-        // DEBUG(DB_GENERAL, std::cout << "Done" << std::endl);
-        free(primary_ray_group.my_rays);
-    }
-    return;
     */
+    int Rx = floor((float) N / M);
+    int group_index = cur_region.second * Rx + cur_region.first;
+    RegionGroup cur_region_group = region_groups[group_index];
+    int num_ray_groups = cur_region_group.my_size;
+
+    int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (thread_index < num_ray_groups){
+        RayGroup cur_ray_group = cur_region_group.my_ray_groups[thread_index];
+        evolve_to_completion(&cur_ray_group, densities, doses, N, M);
+    }
+    
+    
+
+    //free(primary_ray_group.my_rays);
+
+    return;
+    
 }
 
-/// Kernel function for base-GPU
-__global__ void run_rays(RegionGroup *region_groups, double* densities, double* doses, int N, int M)
+/// Kernel function
+__global__ void run_rays(RegionGroup *region_groups, Region *schedule, double* densities, double* doses, int N, int M)
 {
-    run_serial(region_groups, densities, doses, N, M);
+    int num_regions = pow(ceilf(N / M), 2);
+    Region cur_region;
+    for (int i = 0; i < num_regions; i++){
+        cur_region = schedule[i];
+        run_serial(region_groups, cur_region, densities, doses, N, M);
+    }
+    
 }
 
 // TODO could actually make N a command line argument, right?
@@ -469,7 +469,6 @@ int main(void)
     cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_limit);
  
     DEBUG(DB_GPU, std::cout << "Writing densities" << std::endl);
-    //write_to_csv_file(densities, N, "../../plot/densities.csv");
     write_to_csv_file(densities, N, "densities.csv");
     
 
@@ -477,12 +476,13 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
     int num_regions = pow(ceil(N / M), 2); // number of regions
     DEBUG(DB_GPU, std::cout << "Number of regions: " << num_regions << std::endl);
+
+    // create all primary rays on host. One primary ray per (thread) ray group
     RegionGroup *region_groups = (RegionGroup *) malloc(num_regions * sizeof(RegionGroup));
-    //RayGroup *groups = (RayGroup *) malloc(num_regions * sizeof(RayGroup)); // region groups
     initialize_region_groups(region_groups, num_regions, ray_groups_per_region, rays_per_group);
-    //Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
     spawn_primary_rays(region_groups, num_primary_rays, N, M);
     
+    // print all primary rays spawned
     int count = 0;
     for (int i = 0; i < num_regions; i++){
         RegionGroup cur_region_group = region_groups[i];
@@ -496,8 +496,9 @@ int main(void)
                 count++;
         }
     }
+
+    // copy all host data to GPU
     RegionGroup *region_groups_cuda;
-    
     cudaMallocManaged(&region_groups_cuda, num_regions * sizeof(RegionGroup));
     cudaMemcpy(region_groups_cuda, region_groups, num_regions * sizeof(RegionGroup), cudaMemcpyHostToDevice);
     for (int i = 0; i < num_regions; i++){
@@ -523,14 +524,26 @@ int main(void)
             region_groups_cuda[i].my_ray_groups[j].max_size = region_groups[i].my_ray_groups[j].max_size;
         }
     }
-    
 
-    int grid_size = 1; // number of thread blocks
-    int block_size = 1;   // TODO 1 thread per block, does this make sense?
-    run_rays<<<grid_size, block_size>>>(region_groups_cuda, densities, doses, N, M);
+    //TODO: Free host data?
+    printf("building schedule\n");
+    Region *schedule;//
+    cudaMallocManaged(&schedule, num_regions * sizeof(Region));
+    // = (Region *) malloc(num_regions * sizeof(Region));
+    build_schedule(schedule, N, M, true, true);
+    printf("Schedule is: ");
+    for (int i = 0; i < num_regions; i++){
+        printf("%d, %d\n", schedule[i].first, schedule[i].second);
+    }
+
+    int grid_size = 4; // number of thread blocks
+    int block_size = 4;   // TODO 1 thread per block, does this make sense?
+    run_rays<<<grid_size, block_size>>>(region_groups_cuda, schedule, densities, doses, N, M);
+    // TODO: Call run_rays again with new schedule (backward pass, etc)
+          // Or schedule can be made within run_rays. Had device/host issue earlier but haven't tried recently
 
     // Wait for GPU computation to finish
-    //cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
 
     DEBUG(DB_GPU, std::cout << "Writing doses" << std::endl);
     //write_to_csv_file(doses, N, "../../plot/doses.csv");
@@ -551,5 +564,102 @@ Region get_region(Pixel position, int N, int M){
     region.first = floor((float) px / M);
     region.second = floor((float) py / M);
     return region;
+}
+
+__host__ __device__ void build_schedule(Region *schedule, int N, int M, bool forward, bool lr_diag){
+    Region r0 = {0,0};
+    Region r1 = {0,1};
+    Region r2 = {1,0};
+    Region r3 = {0,2};
+    Region r4 = {1,1};
+    Region r5 = {2,0};
+    Region r6 = {0,3};
+    Region r7 = {1,2};
+    Region r8 = {2,1};
+    Region r9 = {3,0};
+    Region r10 = {1,3};
+    Region r11 = {2,2};
+    Region r12 = {3,1};
+    Region r13 = {2,3};
+    Region r14 = {3,2};
+    Region r15 = {3,3};
+    schedule[0] = r0;
+    schedule[1] = r1;
+    schedule[2] = r2;
+    schedule[3] = r3;
+    schedule[4] = r4;
+    schedule[5] = r5;
+    schedule[6] = r6;
+    schedule[7] = r7;
+    schedule[8] = r8;
+    schedule[9] = r9;
+    schedule[10] = r10;
+    schedule[11] = r11;
+    schedule[12] = r12;
+    schedule[13] = r13;
+    schedule[14] = r14;
+    schedule[15] = r15;
+    /*
+    Region cur_region = {0,0};
+    int index = 0;
+    while (cur_region.first != -1 || cur_region.second != -1){
+        printf("cur_region: %d, %d\n", cur_region.first, cur_region.second);
+        schedule[index++] = cur_region;
+        cur_region = get_next_region(cur_region, N, M, forward, lr_diag);
+    }
+    */
+}
+
+__host__ __device__ Region get_next_region(Region cur_region, int N, int M, bool forward, bool lr_diag){
+    int dx, dy; // which direction is "progress" from V to V', not from cur_region to next_region
+    int edge_x, edge_y; // boundary condition. If at some boundary, go somewhere else
+    int max_region = ceilf(N / M) - 1;
+    int rx = cur_region.first, ry = cur_region.second;
+
+    if (forward == true){   // forward pass
+        if (lr_diag == true){ // V is top left node. V' is bottom right node. so diagonal between them is going left to right
+            dx = 1, dy = 1; // right and down
+            edge_x = 0, edge_y = 0;
+        }
+        else{
+            dx = -1, dy = 1; // left and down
+            edge_x = max_region, edge_y = 0;
+        }
+    }
+    else{                   // backwards pass
+        if (lr_diag == true){
+            dx = -1, dy = -1; // left and up
+            edge_x = max_region, edge_y = max_region;
+        }
+        else{
+            dx = 1, dy = -1; // right and up
+            edge_x = 0, edge_y = max_region;
+        }
+    }
+    // TODO implement backwards and other diagonal. Right now, it's just forward, lr logic
+    
+    Region result;
+    if (rx == edge_x && ry == edge_y){
+        result.first = rx; result.second = ry + dy;
+        return result;
+    }
+    else if (ry == edge_y){
+        result.first = 0; result.second = rx + dy;
+        return result;
+    }
+    else{
+        result.first = rx + dx; result.second = ry - dy;
+        if (result.first > max_region || result.second > max_region){
+            result.first = max_region, result.second = max_region;
+        }
+        if(rx == max_region && ry == max_region){
+            result.first = -1, result.second = -1;
+        }
+        return result;
+
+    }
+    //return result;
+
+
 }
 
