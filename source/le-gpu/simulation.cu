@@ -385,9 +385,33 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 
     return;
 }
-__device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N)
+__device__ void run_serial(RegionGroup *region_groups, double* densities, double* doses, int N, int M)
 {
+    printf("Hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
     // Each primary ray is done serially as its own individual ray group
+    
+
+    /// check to see if GPU received all the correct data. It does
+    /*
+    int num_regions = pow(ceilf(N / M), 2); // number of regions
+    printf("N: %d\tM: %d\tnum_regions: %d\n", N, M, num_regions);
+    int count = 0;
+    for (int i = 0; i < num_regions; i++){
+        RegionGroup cur_region_group = region_groups[i];
+        int cur_region_group_size = cur_region_group.my_size;
+        //printf("cur_region_group_size: %d\n", cur_region_group_size);
+        for (int j = 0; j < cur_region_group_size; j++){
+            RayGroup cur_ray_group = cur_region_group.my_ray_groups[j];
+                Ray r = cur_ray_group.my_rays[0];
+                Pixel position = r.get_current_pixel();
+                Region region = r.get_current_region();
+                printf("Primary %d: G: %d, P: %d, %d\tR: %d, %d\n", count, i, position.first, position.second, region.first, region.second);
+                count++;
+        }
+    }
+    return;
+    */
+    /*
     for (int i = 0; i < num_primary_rays; i++)
     {
         printf("Hello from block %d, thread %d. I'm running primary ray %d\n", blockIdx.x, threadIdx.x, i);
@@ -409,12 +433,13 @@ __device__ void run_serial(int num_primary_rays, double* densities, double* dose
         free(primary_ray_group.my_rays);
     }
     return;
+    */
 }
 
 /// Kernel function for base-GPU
-__global__ void run_rays(int num_primary_rays, double* densities, double* doses, int N)
+__global__ void run_rays(RegionGroup *region_groups, double* densities, double* doses, int N, int M)
 {
-    run_serial(num_primary_rays, densities, doses, N);
+    run_serial(region_groups, densities, doses, N, M);
 }
 
 // TODO could actually make N a command line argument, right?
@@ -447,8 +472,7 @@ int main(void)
     //write_to_csv_file(densities, N, "../../plot/densities.csv");
     write_to_csv_file(densities, N, "densities.csv");
     
-    int grid_size = 256; // number of thread blocks
-    int block_size = 128;   // TODO 1 thread per block, does this make sense?
+
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
     int num_regions = pow(ceil(N / M), 2); // number of regions
@@ -465,22 +489,45 @@ int main(void)
         int cur_region_group_size = cur_region_group.my_size;
         for (int j = 0; j < cur_region_group_size; j++){
             RayGroup cur_ray_group = cur_region_group.my_ray_groups[j];
-            int cur_ray_group_size = cur_ray_group.my_size;
-            //for (int k = 0; k < cur_ray_group_size; k++){
                 Ray r = cur_ray_group.my_rays[0];
                 Pixel position = r.get_current_pixel();
                 Region region = r.get_current_region();
                 printf("Primary %d: G: %d, P: %d, %d\tR: %d, %d\n", count, i, position.first, position.second, region.first, region.second);
                 count++;
-            //}
-            
         }
-        
-        
-        
+    }
+    RegionGroup *region_groups_cuda;
+    
+    cudaMallocManaged(&region_groups_cuda, num_regions * sizeof(RegionGroup));
+    cudaMemcpy(region_groups_cuda, region_groups, num_regions * sizeof(RegionGroup), cudaMemcpyHostToDevice);
+    for (int i = 0; i < num_regions; i++){
+        ray_groups_per_region = region_groups[i].my_size;
+        RayGroup *ray_groups_cuda;
+        cudaMallocManaged(&ray_groups_cuda, ray_groups_per_region * sizeof(RayGroup));
+
+        cudaMemcpy(ray_groups_cuda, region_groups[i].my_ray_groups, 
+            ray_groups_per_region * sizeof(RayGroup), cudaMemcpyHostToDevice);
+
+        region_groups_cuda[i].my_ray_groups = ray_groups_cuda;
+        region_groups_cuda[i].my_size = region_groups[i].my_size;
+        region_groups_cuda[i].max_size = region_groups[i].max_size;
+
+        for (int j = 0; j < ray_groups_per_region; j++){
+            Ray *rays_cuda;
+            cudaMallocManaged(&rays_cuda, rays_per_group * sizeof(Ray));
+
+            cudaMemcpy(rays_cuda, region_groups[i].my_ray_groups[j].my_rays,
+                rays_per_group * sizeof(Ray), cudaMemcpyHostToDevice);
+            region_groups_cuda[i].my_ray_groups[j].my_rays = rays_cuda;
+            region_groups_cuda[i].my_ray_groups[j].my_size = region_groups[i].my_ray_groups[j].my_size;
+            region_groups_cuda[i].my_ray_groups[j].max_size = region_groups[i].my_ray_groups[j].max_size;
+        }
     }
     
-    //run_rays<<<grid_size, block_size>>>(primary_rays_per_thread, densities, doses, N);
+
+    int grid_size = 1; // number of thread blocks
+    int block_size = 1;   // TODO 1 thread per block, does this make sense?
+    run_rays<<<grid_size, block_size>>>(region_groups_cuda, densities, doses, N, M);
 
     // Wait for GPU computation to finish
     //cudaDeviceSynchronize();

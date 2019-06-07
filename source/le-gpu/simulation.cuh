@@ -112,7 +112,7 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
 __device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N);
 
 /// Run simulation for a given number  primary rays, in serial
-__device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N);
+__device__ void run_serial(RegionGroup *region_groups, double* densities, double* doses, int N, int M);
 
 Region get_region(Pixel position, int N, int M);
 
