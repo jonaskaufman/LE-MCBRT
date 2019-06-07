@@ -392,7 +392,7 @@ __device__ void run_serial(RegionGroup *region_groups, double* densities, double
     
 
     /// check to see if GPU received all the correct data. It does
-    /*
+    
     int num_regions = pow(ceilf(N / M), 2); // number of regions
     printf("N: %d\tM: %d\tnum_regions: %d\n", N, M, num_regions);
     int count = 0;
@@ -410,7 +410,7 @@ __device__ void run_serial(RegionGroup *region_groups, double* densities, double
         }
     }
     return;
-    */
+    
     /*
     for (int i = 0; i < num_primary_rays; i++)
     {
