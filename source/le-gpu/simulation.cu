@@ -87,11 +87,30 @@ initialize_densities_random_gaussians(double* densities, int N, int n_gaussians,
     return;
 }
 
-__host__ void initialize_ray_groups(RayGroup *groups, int num_groups, int rays_per_group){
-    for (int i = 0; i < num_groups; i++){
-        groups[i].my_rays = (Ray *) malloc(rays_per_group * sizeof(Ray));
-        groups[i].my_size = -1;
-        groups[i].max_size = rays_per_group;
+__host__ void extend_ray_groups(RegionGroup *region_groups, int rays_per_group, int region_index, int max_index){
+    RayGroup *ray_groups = region_groups[region_index].my_ray_groups;
+    ray_groups = (RayGroup *) realloc(ray_groups, (max_index + 0)* 2 * sizeof(RayGroup));
+    region_groups[region_index].my_ray_groups = ray_groups;
+    for (int i = max_index; i < max_index * 2; i++){
+        region_groups[region_index].my_ray_groups[i].my_rays = (Ray *) malloc(rays_per_group * sizeof(Ray));
+        region_groups[region_index].my_ray_groups[i].my_size = 0;
+        region_groups[region_index].my_ray_groups[i].max_size = rays_per_group;
+    }
+    region_groups[region_index].max_size = max_index * 2;
+    
+}
+
+__host__ void initialize_region_groups(RegionGroup *region_groups, int num_regions, int ray_groups_per_region, int rays_per_group){
+    for (int i = 0; i < num_regions; i++){
+        region_groups[i].my_ray_groups = (RayGroup *) malloc(ray_groups_per_region * sizeof(RayGroup));
+        region_groups[i].my_size = -1;
+        region_groups[i].max_size = ray_groups_per_region;
+        for (int j = 0; j < ray_groups_per_region; j++){
+            Ray *r = (Ray *) malloc(rays_per_group * sizeof(Ray));
+            region_groups[i].my_ray_groups[j].my_rays = r;
+            region_groups[i].my_ray_groups[j].my_size = 0;
+            region_groups[i].my_ray_groups[j].max_size = rays_per_group;
+        }
     }
 }
 
@@ -165,7 +184,7 @@ __device__ bool out_of_bounds(Pixel current_pixel, int N)
             current_pixel.second >= N);
 }
 
-__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int M)
+__host__ void spawn_primary_rays(RegionGroup *region_groups, int num_primary_rays, int N, int M)
 {
     for (int i = 0; i < num_primary_rays; i++){
 
@@ -175,7 +194,7 @@ __host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, 
         double horiz_dist_from_center = PARAM_D * N * tan(source_angle); // horizontal distance from center of top edge
         int middle_pixel = N / 2;
         double horiz_dist_from_left = middle_pixel + horiz_dist_from_center;
-
+        
         // If ray does not miss grid entirely, spawn it
         if (horiz_dist_from_left < 0 || horiz_dist_from_left >= N ||
             (source_angle >= M_PI / 2 && source_angle <= 3 * M_PI / 2))
@@ -191,24 +210,29 @@ __host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, 
         double edge_dist = horiz_dist_from_left - horiz_dist_from_left_rounded;
 
         Region region = get_region(spawn_pixel, N, M);
-
         Ray r = Ray::primary(source_angle, spawn_pixel, PIXEL_EDGE::TOP, edge_dist, region);
         
         int Rx = floor((float) N / M);
-        int groups_index = region.second * Rx + region.first;
-        int max_index = groups[groups_index].max_size;
-        int rays_index = groups[groups_index].my_size + 1;
+        int region_index = region.second * Rx + region.first;
+        int max_index = region_groups[region_index].max_size;
+        int group_index = region_groups[region_index].my_size + 1;
+        
 
-        if (rays_index > max_index - 1){
-            Ray *rays = groups[groups_index].my_rays;
-            groups[groups_index].my_rays = (Ray *) realloc(rays, max_index * 2 * sizeof(Ray));
-            groups[groups_index].max_size = max_index * 2;
+        if (group_index > max_index - 1){
+            //printf("resizing array of ray groups\n");
+            //printf("max_index: %d\t group_index: %d\n", max_index, group_index);
+            //printf("Group: %d\t Region: %d, %d\n\n", region_index, region.first, region.second);
+            extend_ray_groups(region_groups, PARAM_KS + 1, region_index, max_index);
+            //printf("finished resizing\n");
         }
-
-        groups[groups_index].my_rays[rays_index] = r;
-        groups[groups_index].my_size = rays_index;
-        printf("Angle: %.2f\tPosition: %d, %d\n", source_angle, spawn_pixel.first, spawn_pixel.second);
-        printf("Group: %d\t Region: %d, %d\n", groups_index, region.first, region.second);
+        //printf("max_index: %d\t group_index: %d\n", region_groups[region_index].max_size, group_index);
+        //printf("Group: %d\t Region: %d, %d\n\n", region_index, region.first, region.second);
+        region_groups[region_index].my_ray_groups[group_index].my_rays[0] = r; // add new ray to the beginning of ray group
+        region_groups[region_index].my_ray_groups[group_index].my_size = 1; // update size
+        region_groups[region_index].my_size = group_index;
+        //printf("Angle: %.2f\tPosition: %d, %d\n", source_angle, spawn_pixel.first, spawn_pixel.second);
+        //printf("max_index: %d\t group_index: %d\n", max_index, group_index);
+        //printf("Group: %d\t Region: %d, %d\n\n", region_index, region.first, region.second);
     }
     
     return;
@@ -399,8 +423,9 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
     int N = 1000; // grid size in pixels per side
     int M = 250; // region size in pixels per side
-    int num_primary_rays = 1000; // number of primary rays to be scattered across the grid
-    int rays_per_group = 10; // initial capacity of a ray group
+    int num_primary_rays = 100; // number of primary rays to be scattered across the grid
+    int rays_per_group = PARAM_KS + 1; // initial capacity of a ray group
+    int ray_groups_per_region = 10; // intial capacity of a region group
 
     // Storing the N by N grid data as 1D arrays of length N*N
     // such that element i,j is at index i * N + j
@@ -428,21 +453,27 @@ int main(void)
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
     int num_regions = pow(ceil(N / M), 2); // number of regions
     DEBUG(DB_GPU, std::cout << "Number of regions: " << num_regions << std::endl);
-    RayGroup *groups = (RayGroup *) malloc(num_regions * sizeof(RayGroup));
-    initialize_ray_groups(groups, num_regions, rays_per_group);
+    RegionGroup *region_groups = (RegionGroup *) malloc(num_regions * sizeof(RegionGroup));
+    //RayGroup *groups = (RayGroup *) malloc(num_regions * sizeof(RayGroup)); // region groups
+    initialize_region_groups(region_groups, num_regions, ray_groups_per_region, rays_per_group);
     //Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
-    spawn_primary_rays(groups, num_primary_rays, N, M);
+    spawn_primary_rays(region_groups, num_primary_rays, N, M);
     
     int count = 0;
     for (int i = 0; i < num_regions; i++){
-        RayGroup cur_group = groups[i];
-        int cur_group_size = cur_group.my_size;
-        for (int j = 0; j < cur_group_size; j++){
-            Ray r = cur_group.my_rays[j];
-            Pixel position = r.get_current_pixel();
-            Region region = r.get_current_region();
-            printf("Primary %d: G: %d, P: %d, %d\tR: %d, %d\n", count, i, position.first, position.second, region.first, region.second);
-            count++;
+        RegionGroup cur_region_group = region_groups[i];
+        int cur_region_group_size = cur_region_group.my_size;
+        for (int j = 0; j < cur_region_group_size; j++){
+            RayGroup cur_ray_group = cur_region_group.my_ray_groups[j];
+            int cur_ray_group_size = cur_ray_group.my_size;
+            //for (int k = 0; k < cur_ray_group_size; k++){
+                Ray r = cur_ray_group.my_rays[0];
+                Pixel position = r.get_current_pixel();
+                Region region = r.get_current_region();
+                printf("Primary %d: G: %d, P: %d, %d\tR: %d, %d\n", count, i, position.first, position.second, region.first, region.second);
+                count++;
+            //}
+            
         }
         
         

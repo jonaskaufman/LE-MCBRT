@@ -32,6 +32,12 @@ struct RayGroup
     int my_size;  // number of rays in array
     int max_size; // max number of rays allocated
 };
+struct RegionGroup
+{
+    RayGroup* my_ray_groups;
+    int my_size;
+    int max_size;
+};
 
 /// Initialize doses (to zero)
 __host__ void initialize_doses(double* doses, int N);
@@ -46,7 +52,11 @@ __host__ void initialize_densities_constant(double* densities, int N, double den
 //  with spread (std dev) given as fraction of grid size
 __host__ void initialize_densities_centered_gaussian(double* densities, int N, double max_density, double spread);
 
-__host__ void initialize_ray_groups(RayGroup *groups);
+/// allocate memory for array of rays
+__host__ void extend_region_group(RegionGroup *region_group, int rays_per_group, int region_index, int max_index);
+
+/// allocate memory for each region group and it's ray groups
+__host__ void initialize_region_groups(RegionGroup *region_groups, int num_regions, int ray_groups_per_region,  int rays_per_group);
 
 /// Initialize densities with multiple Gaussians at random positions,
 //  with highest resulting density normalized to given max_density
