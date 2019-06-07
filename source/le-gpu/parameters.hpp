@@ -13,6 +13,7 @@
 #define PARAM_MINERGY                                                                                                  \
     0.000000001 /// minimum energy a secondary ray can have before dying
                 /// useful to avoid comparing to 0 which can cause error
+#define PARAM_EPSILON 0.00000001 // for comparing equality of angle and 2*pi
 
 /// Label the pixel edges
 enum class PIXEL_EDGE

@@ -59,18 +59,18 @@ __host__ void write_to_csv_file(double* grid_data, int N, const std::string& fil
 /// Random distributions
 std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
 std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound, upperbound}
-std::uniform_real_distribution<double> uniform_angle_gen{0.0,
-    2 * M_PI}; // uniform distributioin between 0 and 2 pi
+std::normal_distribution<double> normal_dist{PARAM_MEAN,
+    PARAM_SIGMA}; // normal distribribution, pass {mean, stddev}
 
 __device__ void init_curand_state(curandState_t* state); // initialize curand state based on clock, thread id
 
 __device__ double uniform_angle_dist(curandState_t* state); // uniform between 0 and 2 pi
 
-__device__ double normal_dist(curandState_t* state, double mean, double std_dev); // normal with given mean and std dev
+__device__ double normal_angle_dist(curandState_t* state, double mean, double std_dev); // normal with given mean and std dev
 
 /// Randomly sample source angle for primary rays
-__device__ double random_source_angle_normal();
-__host__ double random_source_angle();
+__host__ double random_source_angle_normal();
+__device__ double random_source_angle_uniform();
 
 /// Randomly sample a coordinate for primary rays
 __host__ Pixel random_pixel();
@@ -78,8 +78,11 @@ __host__ Pixel random_pixel();
 /// Check if a given pixel lies outside the bounds of the grid
 __device__ bool out_of_bounds(Pixel current_pixel, int N);
 
+/// Generate single primary ray
+__host__ Ray spawn_primary_ray(int N, int M);
+
 /// Generate new primary ray from source
-__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int Rx, int Ry);
+__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int M);
 
 /// Generate secondary rays from interaction point
 __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N);
@@ -101,6 +104,6 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 /// Run simulation for a given number  primary rays, in serial
 __device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N);
 
-Region get_region(Pixel position, int N, int Rx, int Ry);
+Region get_region(Pixel position, int N, int M);
 
 #endif

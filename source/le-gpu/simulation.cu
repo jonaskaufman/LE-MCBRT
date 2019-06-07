@@ -87,11 +87,11 @@ initialize_densities_random_gaussians(double* densities, int N, int n_gaussians,
     return;
 }
 
-__host__ void initialize_ray_groups(RayGroup *groups, int R, int group_size){
-    for (int i = 0; i < R; i++){
-        groups[i].my_rays = (Ray *) malloc(group_size * sizeof(Ray));
-        groups[i].my_size = 0;
-        groups[i].max_size = group_size;
+__host__ void initialize_ray_groups(RayGroup *groups, int num_groups, int rays_per_group){
+    for (int i = 0; i < num_groups; i++){
+        groups[i].my_rays = (Ray *) malloc(rays_per_group * sizeof(Ray));
+        groups[i].my_size = -1;
+        groups[i].max_size = rays_per_group;
     }
 }
 
@@ -122,35 +122,31 @@ __device__ void init_curand_state(curandState_t* state)
 
 __device__ double uniform_angle_dist(curandState_t* state) { return 2 * M_PI * curand_uniform_double(state); }
 
-__device__ double normal_dist(curandState_t* state, double mean, double std_dev)
+__device__ double normal_angle_dist(curandState_t* state, double mean, double std_dev)
 {
     return mean + std_dev * curand_normal_double(state);
 }
 
-__device__ double random_source_angle_normal()
+__device__ double random_source_angle_uniform()
 {
     curandState state;
     init_curand_state(&state);
 
-    double angle = normal_dist(&state, PARAM_MEAN, PARAM_SIGMA);
+    double angle = uniform_angle_dist(&state);
     
     // Normalize angle
-    if (angle < 0)
+    if (abs(angle - 2 * M_PI) < PARAM_EPSILON)// if angle == 2pi, angle = 0
     {
-        angle += 2 * M_PI;
-    }
-    else if (angle >= 2 * M_PI)
-    {
-        angle -= 2 * M_PI;
+        angle = 0;
     }
     return angle;
 }
 
-__host__ double random_source_angle()
+__host__ double random_source_angle_normal()
 {
-    double angle = uniform_angle_gen(random_engine);
+    double angle = normal_dist(random_engine);
     // Normalize angle
-    while (angle < 0)
+    while (angle < 0.0)
     {
         angle += 2 * M_PI;
     }
@@ -162,26 +158,6 @@ __host__ double random_source_angle()
 
 }
 
-__host__ Pixel random_pixel(int N)
-{
-    Pixel result;
-    result.first = floor(uniform_dist(random_engine) * N);
-    result.second = floor(uniform_dist(random_engine) * N);
-    return result;
-}
-
-__host__ PIXEL_EDGE random_pixel_edge()
-{
-    int rand_num = floor(uniform_dist(random_engine) * 4);
-    switch (rand_num)
-    {
-        case 0: return PIXEL_EDGE::TOP;
-        case 1: return PIXEL_EDGE::RIGHT;
-        case 2: return PIXEL_EDGE::BOTTOM;
-        case 3: return PIXEL_EDGE::LEFT;
-    }
-    return PIXEL_EDGE::TOP;
-}
 
 __device__ bool out_of_bounds(Pixel current_pixel, int N)
 {
@@ -189,21 +165,41 @@ __device__ bool out_of_bounds(Pixel current_pixel, int N)
             current_pixel.second >= N);
 }
 
-__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int Rx, int Ry)
+__host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, int M)
 {
     for (int i = 0; i < num_primary_rays; i++){
+
         // Randomly select source angle from normal distribution
-        double source_angle = random_source_angle();
-        Pixel position = random_pixel(N);
-        PIXEL_EDGE edge = random_pixel_edge();
-        double edge_dist = uniform_dist(random_engine);
-        Region region = get_region(position, N, Rx, Ry);
-        Ray r = Ray::primary(source_angle, position, edge, edge_dist, region);
+        double source_angle = random_source_angle_normal();
+        // Calculate initial ray position
+        double horiz_dist_from_center = PARAM_D * N * tan(source_angle); // horizontal distance from center of top edge
+        int middle_pixel = N / 2;
+        double horiz_dist_from_left = middle_pixel + horiz_dist_from_center;
+
+        // If ray does not miss grid entirely, spawn it
+        if (horiz_dist_from_left < 0 || horiz_dist_from_left >= N ||
+            (source_angle >= M_PI / 2 && source_angle <= 3 * M_PI / 2))
+        {
+            continue;
+            // DEBUG(DB_INIT_PRI, std::cout << "New primary ray missed the grid, not adding" << std::endl);
+        }
+        
+        double horiz_dist_from_left_rounded = floor(horiz_dist_from_left);
+        Pixel spawn_pixel;
+        spawn_pixel.first = horiz_dist_from_left_rounded;
+        spawn_pixel.second = 0; // always starts from top of grid
+        double edge_dist = horiz_dist_from_left - horiz_dist_from_left_rounded;
+
+        Region region = get_region(spawn_pixel, N, M);
+
+        Ray r = Ray::primary(source_angle, spawn_pixel, PIXEL_EDGE::TOP, edge_dist, region);
+        
+        int Rx = floor((float) N / M);
         int groups_index = region.second * Rx + region.first;
         int max_index = groups[groups_index].max_size;
         int rays_index = groups[groups_index].my_size + 1;
 
-        if (rays_index > max_index){
+        if (rays_index > max_index - 1){
             Ray *rays = groups[groups_index].my_rays;
             groups[groups_index].my_rays = (Ray *) realloc(rays, max_index * 2 * sizeof(Ray));
             groups[groups_index].max_size = max_index * 2;
@@ -211,10 +207,7 @@ __host__ void spawn_primary_rays(RayGroup *groups, int num_primary_rays, int N, 
 
         groups[groups_index].my_rays[rays_index] = r;
         groups[groups_index].my_size = rays_index;
-        
-        std::string edge_name = Ray::get_edge_name(edge);
-
-        printf("Primary: A: %.2f\tP: %d, %d\t E: %s\tED: %.2f\n", source_angle, position.first, position.second, edge_name.c_str(), edge_dist);
+        printf("Angle: %.2f\tPosition: %d, %d\n", source_angle, spawn_pixel.first, spawn_pixel.second);
         printf("Group: %d\t Region: %d, %d\n", groups_index, region.first, region.second);
     }
     
@@ -228,7 +221,7 @@ __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double 
     //                                 << spawn_pixel.second << "..." << std::endl);
     for (int i = 0; i < PARAM_KS; i++)
     {
-        double source_angle = random_source_angle_normal(); // uniform random source angle
+        double source_angle = random_source_angle_uniform(); // uniform random source angle
         double partial_energy = total_energy / PARAM_KS;
         Ray new_ray = Ray::secondary_from_center(source_angle, spawn_pixel, partial_energy);
         Pixel current_pixel = new_ray.get_current_pixel();
@@ -404,9 +397,9 @@ __global__ void run_rays(int num_primary_rays, double* densities, double* doses,
 int main(void)
 {
     DEBUG(DB_GPU, std::cout << "Starting simulation, allocating grids" << std::endl);
-    int N = 36; // grid size in pixels per side
-    int Rx = 3, Ry = 4; // grid divided into Rx * Ry regions
-    int num_primary_rays = 100; // number of primary rays to be scattered across the grid
+    int N = 1000; // grid size in pixels per side
+    int M = 250; // region size in pixels per side
+    int num_primary_rays = 1000; // number of primary rays to be scattered across the grid
     int rays_per_group = 10; // initial capacity of a ray group
 
     // Storing the N by N grid data as 1D arrays of length N*N
@@ -433,13 +426,15 @@ int main(void)
     int block_size = 128;   // TODO 1 thread per block, does this make sense?
 
     DEBUG(DB_GPU, std::cout << "Running rays on threads" << std::endl);
-    RayGroup *groups = (RayGroup *) malloc(Rx * Ry * sizeof(RayGroup));
-    initialize_ray_groups(groups, Rx * Ry, rays_per_group);
+    int num_regions = pow(ceil(N / M), 2); // number of regions
+    DEBUG(DB_GPU, std::cout << "Number of regions: " << num_regions << std::endl);
+    RayGroup *groups = (RayGroup *) malloc(num_regions * sizeof(RayGroup));
+    initialize_ray_groups(groups, num_regions, rays_per_group);
     //Ray *rays = (Ray *) malloc(num_primary_rays * sizeof(Ray));
-    spawn_primary_rays(groups, num_primary_rays, N, Rx, Ry);
+    spawn_primary_rays(groups, num_primary_rays, N, M);
     
     int count = 0;
-    for (int i = 0; i < Rx * Ry; i++){
+    for (int i = 0; i < num_regions; i++){
         RayGroup cur_group = groups[i];
         int cur_group_size = cur_group.my_size;
         for (int j = 0; j < cur_group_size; j++){
@@ -470,14 +465,13 @@ int main(void)
     return 0;
 }
 
-Region get_region(Pixel position, int N, int Rx, int Ry){
+Region get_region(Pixel position, int N, int M){
     int px = position.first;
     int py = position.second;
-    int size_x = floor((float) N / Rx);
-    int size_y = floor((float) N / Ry);
+
     Region region;
-    region.first = floor((float) px / size_x);
-    region.second = floor((float) py / size_y);
+    region.first = floor((float) px / M);
+    region.second = floor((float) py / M);
     return region;
 }
 
