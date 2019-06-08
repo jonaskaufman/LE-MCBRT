@@ -2,18 +2,15 @@
 #define PARAMETERS_H
 
 /// Simulation parameters
-#define PARAM_D 1.0     /// source distance as relative to grid size
-#define PARAM_MEAN 0.0  /// source angle mean
-#define PARAM_SIGMA 0.1 /// source angle std dev in radians
-#define PARAM_E0 100.0  /// initial primary ray energy
-#define PARAM_A 2.0     /// primary ray interaction probability scaling
-#define PARAM_F 0.05    /// primary ray interaction energy deposit fraction
-#define PARAM_G 1.0     /// secondary ray deposition constant
-#define PARAM_KS 10     /// number of secondary rays to spawn after interaction
-#define PARAM_MINERGY                                                                                                  \
-    0.000000001 /// minimum energy a secondary ray can have before dying
-                /// useful to avoid comparing to 0 which can cause error
-#define PARAM_EPSILON 0.00000001 // for comparing equality of angle and 2*pi
+#define PARAM_D 1.0                  /// source distance as relative to grid size
+#define PARAM_MEAN 0.0               /// source angle mean
+#define PARAM_SIGMA 0.1              /// source angle std dev in radians
+#define PARAM_E0 100.0               /// initial primary ray energy
+#define PARAM_A 2.0                  /// primary ray interaction probability scaling
+#define PARAM_F 0.05                 /// primary ray interaction energy deposit fraction
+#define PARAM_G 1.0                  /// secondary ray deposition constant
+#define PARAM_KS 10                  /// number of secondary rays to spawn after interaction
+#define PARAM_EPSILON 0.000000000001 /// tolerance for zero-checking
 
 /// Label the pixel edges
 enum class PIXEL_EDGE
@@ -38,7 +35,7 @@ enum class PIXEL_EDGE
     }
 
 /* Debug codes */
-#define CUR_DEBUG DB_GPU
+#define CUR_DEBUG DB_HOST
 
 #define DB_ALL -1
 #define DB_NONE 0
@@ -50,6 +47,7 @@ enum class PIXEL_EDGE
 #define DB_EVOLVE_SEC 5 // evolve secondary ray
 #define DB_TRACE 6      // trace ray from pixel to pixel
 #define DB_GPU 7        // base GPU version
+#define DB_HOST 8       // host debug statements
 
 #endif
 

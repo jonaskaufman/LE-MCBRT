@@ -1,55 +1,28 @@
 #include "ray.cuh"
 #include <assert.h>
 
-CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
-                              const double& angle,
-                              const Pixel& pixel,
-                              const PIXEL_EDGE& edge,
-                              const double& edge_dist,
-                              const Region& region,
-                              const double& energy)
+CUDA_CALLABLE_MEMBER Ray::Ray(bool primary, double angle, Pixel pixel, PIXEL_EDGE edge, double edge_dist, double energy)
     : m_active(true),
       m_primary(primary),
       m_angle(angle),
       m_current_pixel(pixel),
       m_current_edge(edge),
       m_current_edge_dist(edge_dist),
-      m_current_region(region),
       m_current_energy(energy)
 {
 }
-// TODO: Delete this
-CUDA_CALLABLE_MEMBER Ray::Ray(const bool& primary,
-    const double& angle,
-    const Pixel& pixel,
-    const PIXEL_EDGE& edge,
-    const double& edge_dist,
-    const double& energy)
-: m_active(true),
-m_primary(primary),
-m_angle(angle),
-m_current_pixel(pixel),
-m_current_edge(edge),
-m_current_edge_dist(edge_dist),
-m_current_energy(energy)
-{
-}
 
-
-CUDA_CALLABLE_MEMBER Ray Ray::primary(const double angle,
-                                      Pixel spawn_pixel,
-                                      PIXEL_EDGE spawn_edge,
-                                      double spawn_edge_dist,
-                                      Region region)
+CUDA_CALLABLE_MEMBER Ray
+Ray::primary(double angle, Pixel spawn_pixel, PIXEL_EDGE spawn_edge, double spawn_edge_dist)
 {
-    return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, region, PARAM_E0);
+    return Ray(true, angle, spawn_pixel, spawn_edge, spawn_edge_dist, PARAM_E0);
 }
 
 CUDA_CALLABLE_MEMBER Ray Ray::secondary_from_center(double angle, Pixel spawn_pixel, double energy)
 {
-//    DEBUG(DB_INIT_SEC, std::cout << "New secondary ray spawning from center of pixel " << spawn_pixel.first << ","
-//                                 << spawn_pixel.second << " with angle " << angle << " and energy " << energy
-//                                 << std::endl);
+    //    DEBUG(DB_INIT_SEC, std::cout << "New secondary ray spawning from center of pixel " << spawn_pixel.first << ","
+    //                                 << spawn_pixel.second << " with angle " << angle << " and energy " << energy
+    //                                 << std::endl);
     PIXEL_EDGE new_edge;
     int flip;
     double offset;
@@ -92,8 +65,10 @@ CUDA_CALLABLE_MEMBER Ray Ray::secondary_from_center(double angle, Pixel spawn_pi
     new_pixel.first = spawn_pixel.first + i_adjust;
     new_pixel.second = spawn_pixel.second + j_adjust;
     double new_edge_dist = 0.5 + 0.5 * flip * tan(angle - offset);
-//    DEBUG(DB_INIT_SEC, std::cout << "Moved to " << _get_edge_name(new_edge) << " edge of pixel " << new_pixel.first
-//                                 << "," << new_pixel.second << ", new edge dist is " << new_edge_dist << std::endl);
+    //    DEBUG(DB_INIT_SEC, std::cout << "Moved to " << _get_edge_name(new_edge) << " edge of pixel " <<
+    //    new_pixel.first
+    //                                 << "," << new_pixel.second << ", new edge dist is " << new_edge_dist <<
+    //                                 std::endl);
     assert(new_edge_dist > 0 && new_edge_dist <= 1);
     return Ray(false, angle, new_pixel, new_edge, new_edge_dist, energy);
 }
@@ -108,11 +83,15 @@ CUDA_CALLABLE_MEMBER void Ray::deactivate()
     return;
 }
 
+CUDA_CALLABLE_MEMBER void Ray::reactivate()
+{
+    m_active = true;
+    return;
+}
+
 CUDA_CALLABLE_MEMBER Pixel Ray::get_current_pixel() { return m_current_pixel; }
 
 CUDA_CALLABLE_MEMBER double Ray::get_current_energy() { return m_current_energy; }
-
-CUDA_CALLABLE_MEMBER Region Ray::get_current_region() { return m_current_region; }
 
 CUDA_CALLABLE_MEMBER void Ray::set_current_energy(double new_energy)
 {
@@ -149,10 +128,11 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
     double pixel_dist_x = local_coords.x;
     double pixel_dist_y = local_coords.y;
 
-//    DEBUG(DB_TRACE, std::cout << "Beginning trace, ray is on " << _get_edge_name(m_current_edge) << " edge of pixel "
-//                              << m_current_pixel.first << "," << m_current_pixel.second << std::endl);
-//    DEBUG(DB_TRACE, std::cout << "x,y distance from top left of current pixel is " << pixel_dist_x << ","
-//                              << pixel_dist_y << std::endl);
+    //    DEBUG(DB_TRACE, std::cout << "Beginning trace, ray is on " << _get_edge_name(m_current_edge) << " edge of
+    //    pixel "
+    //                              << m_current_pixel.first << "," << m_current_pixel.second << std::endl);
+    //    DEBUG(DB_TRACE, std::cout << "x,y distance from top left of current pixel is " << pixel_dist_x << ","
+    //                              << pixel_dist_y << std::endl);
 
     // Variables numbered with 1 are for case of moving to an adjacent horizontal pixel
     // Variables numbered with 2 are for case of moving to an adjacent vertical pixel
@@ -179,7 +159,7 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
         alpha = m_angle;
         dir_vert = 1;
         dir_horiz = 1;
-//      DEBUG(DB_TRACE, std::cout << "Going SE with angle " << m_angle << std::endl);
+        //      DEBUG(DB_TRACE, std::cout << "Going SE with angle " << m_angle << std::endl);
     }
     else if (m_angle < M_PI) // going NE
     {
@@ -190,7 +170,7 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
         alpha = M_PI - m_angle;
         dir_vert = -1;
         dir_horiz = 1;
-//        DEBUG(DB_TRACE, std::cout << "Going NE with angle " << m_angle << std::endl);
+        //        DEBUG(DB_TRACE, std::cout << "Going NE with angle " << m_angle << std::endl);
     }
     else if (m_angle < 3 * M_PI / 2) // going NW
     {
@@ -201,7 +181,7 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
         alpha = m_angle - M_PI;
         dir_vert = -1;
         dir_horiz = -1;
-//        DEBUG(DB_TRACE, std::cout << "Going NW with angle " << m_angle << std::endl);
+        //        DEBUG(DB_TRACE, std::cout << "Going NW with angle " << m_angle << std::endl);
     }
     else // going SW
     {
@@ -212,7 +192,7 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
         alpha = 2 * M_PI - m_angle;
         dir_vert = 1;
         dir_horiz = -1;
-//        DEBUG(DB_TRACE, std::cout << "Going SW with angle " << m_angle << std::endl);
+        //        DEBUG(DB_TRACE, std::cout << "Going SW with angle " << m_angle << std::endl);
     }
 
     // Determine known side lengths of candidate triangles
@@ -293,14 +273,15 @@ CUDA_CALLABLE_MEMBER TraceHistory Ray::trace()
     Pixel new_pixel;
     new_pixel.first = m_current_pixel.first + delta_x;
     new_pixel.second = m_current_pixel.second + delta_y;
-//    DEBUG(DB_TRACE, std::cout << "Moving to " << _get_edge_name(new_edge) << " edge of pixel " << new_pixel.first << ","
-//                              << new_pixel.second << ", new edge dist is " << new_edge_dist << std::endl);
+    //    DEBUG(DB_TRACE, std::cout << "Moving to " << _get_edge_name(new_edge) << " edge of pixel " << new_pixel.first
+    //    << ","
+    //                              << new_pixel.second << ", new edge dist is " << new_edge_dist << std::endl);
     m_current_pixel = new_pixel;
     m_current_edge = new_edge;
     m_current_edge_dist = new_edge_dist;
 
     // All done
-//    DEBUG(DB_TRACE, std::cout << "Done" << std::endl << std::endl);
+    //    DEBUG(DB_TRACE, std::cout << "Done" << std::endl << std::endl);
     TraceHistory result;
     result.visited = old_pixel;
     result.distance = dist_traveled;
