@@ -157,7 +157,7 @@ __host__ double random_source_angle_normal()
 
 ////////// RAY LOCATION CHECKING //////////
 
-__host__ Region get_region(Pixel position, int N, int M)
+__host__ __device__ Region get_region(Pixel position, int N, int M)
 {
     int px = position.first;
     int py = position.second;
@@ -165,6 +165,13 @@ __host__ Region get_region(Pixel position, int N, int M)
     region.first = px / M;
     region.second = py / M;
     return region;
+}
+
+__host__ __device__ int get_region_index(Pixel position, int N, int M)
+{
+    Region region = get_region(position, N, M);
+    int L = N / M; // number of regions per side
+    return region.first + region.second * L;
 }
 
 __device__ bool out_of_bounds(Pixel current_pixel, int N)
@@ -271,10 +278,11 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
     return;
 }
 
-__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N, int M)
+// TODO needs to take pointer to a RegroupBuffer as argument
+__device__ int evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M)
 {
     int rays_evolved = 0;
-
+    int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
     for (int i = 0; i < group->my_size; i++)
     {
         Ray* r = &group->my_rays[i];
@@ -310,24 +318,43 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
                 r->deactivate();
             }
 
-            // TODO Add checking for ray leaving region, with regrouping buffer
+            // Check if the ray is still in the region
+            int new_region_index = get_region_index(r->get_current_pixel(), N, M);
+            if (new_region_index != region_index)
+            {
+                r->deactivate();
+
+                // TODO add it to buffer (calling it g_buff, a ptr to  RegroupBuffer)
+                /*
+                int buff_index = thread_index * g_buff->section_size +
+                                 g_buff->ray_counts[thread_index];     // this thread's next index in buffer
+                g_buff->rays[buff_index] = r;                          // add ray to buffer
+                g_buff->region_indices[buff_index] = new_region_index; // add destination region index to buffer
+                g_buff->ray_counts[thread_index]++;                    // update buffer size
+                */
+            }
         }
     }
     return rays_evolved;
 }
 
-__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N, int M)
+__device__ void evolve_to_completion(RayGroup* group, int region_index, double* densities, double* doses, int N, int M)
 {
     int rays_evolved = group->my_size;
     while (rays_evolved > 0)
     {
-        rays_evolved = evolve_rays(group, densities, doses, N, M);
+        rays_evolved = evolve_rays(group, region_index, densities, doses, N, M);
     }
     return;
 }
 
-__global__ void
-run_rays(RayGroup* region_group_arr, int region_group_arr_size, double* densities, double* doses, int N, int M)
+__global__ void run_rays(RayGroup* region_group_arr,
+                         int region_group_arr_size,
+                         int region_index,
+                         double* densities,
+                         double* doses,
+                         int N,
+                         int M)
 {
     // printf("Hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
     int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -335,7 +362,7 @@ run_rays(RayGroup* region_group_arr, int region_group_arr_size, double* densitie
     {
         RayGroup* cur_ray_group = &region_group_arr[thread_index];
         printf("thread index %d: evolving %d rays\n", thread_index, cur_ray_group->my_size);
-        evolve_to_completion(cur_ray_group, densities, doses, N, M);
+        evolve_to_completion(cur_ray_group, region_index, densities, doses, N, M);
     }
 
     return;
@@ -366,10 +393,8 @@ __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double*
     int L = N / M;                                       // number of regions per side
     std::vector<int> schedule = get_forward_schedule(L); // linear indices of regions in diagonal order
 
-    // TODO only traversing one diagonal back and forth for now
-    // Why do we need to do other diagonal?
     int rays_remaining = 1;
-    while (rays_remaining > 0) // TODO: add checking for when all rays are done
+    while (rays_remaining > 0) // TODO: add multiple passes, checking for when all rays are done
     {
         // Forward pass
         for (std::vector<int>::iterator f_it = schedule.begin(); f_it != schedule.end(); f_it++)
@@ -377,7 +402,9 @@ __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double*
             int region_index = *f_it;
             DEBUG(DB_HOST, std::cout << "Forward pass. Running region group " << region_index << std::endl);
             DEBUG(DB_HOST, std::cout << "It has " << region_groups[region_index].size() << " ray groups" << std::endl);
-            run_region_group(region_groups[region_index], densities, doses, N, M);
+            run_region_group(region_groups[region_index], region_index, densities, doses, N, M);
+            // TODO get regroup buffer from run_region_group, pass it and region_groups to a new function to do regrouping
+            // Remember rays need to be reactivated during regrouping
         }
 
         // Reverse pass
@@ -386,7 +413,7 @@ __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double*
             int region_index = *r_it;
             DEBUG(DB_HOST, std::cout << "Reverse pass. Running region group " << region_index << std::endl);
             DEBUG(DB_HOST, std::cout << "It has " << region_groups[region_index].size() << " ray groups" << std::endl);
-            run_region_group(region_groups[region_index], densities, doses, N, M);
+            run_region_group(region_groups[region_index], region_index, densities, doses, N, M);
         }
 
         rays_remaining = 0;
@@ -394,7 +421,10 @@ __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double*
     return;
 }
 
-__host__ void run_region_group(RegionGroup& region_group, double* densities, double* doses, int N, int M)
+// TODO I think this should return a host regroup buffer that can be passed to another function to handle the actual
+// regrouping
+__host__ void
+run_region_group(RegionGroup& region_group, int region_index, double* densities, double* doses, int N, int M)
 {
     // Set device memory limits
     size_t heap_limit = 1 << 26; // default 8MB, this sets to 64 MB
@@ -402,7 +432,7 @@ __host__ void run_region_group(RegionGroup& region_group, double* densities, dou
 
     // First copy rays to ray groups on device, done by just replacing host pointers with device pointers
     int num_ray_groups = region_group.size(); // number of ray groups in current region group
-    DEBUG(DB_HOST, std::cout << "Copying rays from host to device" << std::endl);
+    DEBUG(DB_HOST, std::cout << "Copying rays from host to device" << std::endl); 
     for (int g = 0; g < num_ray_groups; g++)
     {
         int max_num_rays = region_group[g].max_size;
@@ -425,11 +455,14 @@ __host__ void run_region_group(RegionGroup& region_group, double* densities, dou
     // Clear region group vector because we messed with its memory, and its rays are all going to be run
     region_group.clear();
 
+    // TODO allocate g_buffer on DEVICE
+    // We need to be a little careful in making sure the section size of the buffer is always enough to handle all rays from a given thread group. We could check in the above for loop for the largest "max_num_rays" found and use that (even though we will probably make all the ray groups with the same max_size)
+
     // TODO make sure there are enough threads to handle all ray groups
     // Run thread groups in parallel
     int grid_size = 256;  // number of thread blocks
     int block_size = 128; // number of threads per block
-    run_rays<<<grid_size, block_size>>>(region_group_cuda_arr, num_ray_groups, densities, doses, N, M);
+    run_rays<<<grid_size, block_size>>>(region_group_cuda_arr, num_ray_groups, region_index, densities, doses, N, M);
 
     // Wait for GPU computation to finish
     cudaDeviceSynchronize();
@@ -437,6 +470,8 @@ __host__ void run_region_group(RegionGroup& region_group, double* densities, dou
     // Free device memory
     // TODO free ray group pointers
     cudaFree(region_group_cuda_arr);
+
+    // TODO copy g_buffer back to host buffer
 
     return;
 }

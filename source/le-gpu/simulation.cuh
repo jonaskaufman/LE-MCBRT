@@ -38,6 +38,17 @@ struct Region
     int second;
 };
 
+/// Struct to handle buffer for regrouping rays
+//  The arrays here consist of p sections of size q
+//  In use, each thread writes to its own section
+struct RegroupBuffer
+{
+    int section_size;    // this is q, how much space is allocated to each section
+    Ray* rays;           // size p*q, rays to be regrouped
+    int* region_indices; // size p*q, linear indices of regions to which to move rays
+    int* ray_counts;     // size p, counter of how many rays are in each section of buffer
+};
+
 ////////// GRID INITIALIZATION //////////
 
 /// Initialize doses (to zero)
@@ -83,6 +94,9 @@ __host__ double random_source_angle_normal();
 /// Return the region containing a give pixel
 __host__ __device__ Region get_region(Pixel position, int N, int M);
 
+/// Return the linear index of the region containing a given pixel
+__host__ __device__ int get_region_index(Pixel position, int N, int M);
+
 /// Check if a given pixel lies outside the bounds of the grid
 __device__ bool out_of_bounds(Pixel current_pixel, int N);
 
@@ -106,14 +120,21 @@ __device__ void
 transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N);
 
 /// Evolve all active rays in group by one step, return the number of rays evolved
-__device__ int evolve_rays(RayGroup* group, double* densities, double* doses, int N, int M);
+__device__ int evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M);
 
 /// Evolve all rays in group until complete, i.e. none are active
-__device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N, int M);
+__device__ void evolve_to_completion(RayGroup* group, int region_index, double* densities, double* doses, int N, int M);
 
 /// Kernel function: Run each thread group in the given region group array in parallel,
 //  rays within each thread group are run in serial
-__global__ void run_rays(RayGroup* region_group_arr, int region_group_arr_size, Region current_region, double* densities, double* doses, int N, int M);
+__global__ void run_rays(RayGroup* region_group_arr,
+                         int region_group_arr_size,
+                         int region_index,
+                         Region current_region,
+                         double* densities,
+                         double* doses,
+                         int N,
+                         int M);
 
 ////////// REGION GROUP RUNNING AND PROCESSING //////////
 
@@ -127,6 +148,6 @@ run_region_groups(std::vector<RegionGroup>& region_groups, double* densities, do
 
 /// Run each ray group within a single region group on its own thread
 __host__ void
-run_region_group(RegionGroup& region_group, double* densities, double* doses, int N, int M);
+run_region_group(RegionGroup& region_group, int region_index, double* densities, double* doses, int N, int M);
 
 #endif
