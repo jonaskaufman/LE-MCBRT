@@ -333,7 +333,7 @@ __device__ int evolve_rays(
                 g_buffer_cuda->region_indices[buffer_index] =
                     new_region_index;                      // add destination region index to buffer
                 g_buffer_cuda->ray_counts[thread_index]++; // update buffer size
-                printf("Ray added to buffer\n");
+                printf("Ray %d added to buffer\n", g_buffer_cuda->ray_counts[thread_index]);
             }
         }
     }
@@ -343,6 +343,8 @@ __device__ int evolve_rays(
 __device__ void evolve_to_completion(
     RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda)
 {
+    
+
     int rays_evolved = group->my_size;
     while (rays_evolved > 0)
     {
@@ -361,7 +363,19 @@ __global__ void run_rays(RayGroup* region_group_arr,
                          RegroupBuffer* g_buffer_cuda)
 {
     // printf("Hello from block %d, thread %d\n", blockIdx.x, threadIdx.x);
+
+
     int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    printf("region_group_arr_size: %d\n", region_group_arr_size);
+    printf("printing g_buffer_cuda raycounts\n");
+    if (thread_index == 0){
+        for (int i = 0; i < region_group_arr_size; i++){
+            printf("%d: %d", i, g_buffer_cuda->ray_counts[i]);
+        }
+        printf("\n");
+    }
+    
     if (thread_index < region_group_arr_size)
     {
         RayGroup* cur_ray_group = &region_group_arr[thread_index];
@@ -379,6 +393,7 @@ __global__ void run_rays(RayGroup* region_group_arr,
 __host__ void
 regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups)
 {
+    DEBUG(DB_HOST, std::cout << "Starting regrouping. Num_ray_groups is " << num_ray_groups << std::endl);
     for (int i = 0; i < num_ray_groups; i++)
     {
         int buffer_index = i * g_buffer->section_size; // index into single ray groups data
@@ -386,6 +401,7 @@ regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int ma
         int* region_indices =
             &g_buffer->region_indices[buffer_index]; // array of regions corresponding to array of rays
         int num_rays = g_buffer->ray_counts[i];      // number of rays to be regrouped
+        DEBUG(DB_HOST, std::cout << "Regrouping " << num_rays <<  " rays." << std::endl);
 
         for (int j = 0; j < num_rays; j++)
         {
@@ -395,6 +411,8 @@ regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int ma
             int region_group_size = region_groups[new_region].size(); // size of the region's last ray group
             RayGroup last_ray_group =
                 region_groups[new_region][region_group_size - 1]; // last ray group in the region group
+            
+            DEBUG(DB_HOST, std::cout << "regrouping a ray into region " << new_region << std::endl);
 
             int ray_group_size = last_ray_group.my_size;
             if (ray_group_size < max_num_rays) // if last ray group is not full, add ray to ray group
@@ -450,18 +468,27 @@ __host__ void init_regroup_buffer_cuda(RegroupBuffer*& g_buffer_cuda, int max_nu
 __host__ void
 copy_regroup_buffer_host(RegroupBuffer*& g_buffer, RegroupBuffer*& g_buffer_cuda, int max_num_rays, int num_ray_groups)
 {
-    DEBUG(DB_HOST, std::cout << "Allocating memory for buffer on host" << std::cout);
+    DEBUG(DB_HOST, std::cout << "Allocating memory for buffer on host" << std::endl);
     g_buffer = (RegroupBuffer*)malloc(sizeof(RegroupBuffer));
     g_buffer->rays = (Ray*)malloc(num_ray_groups * max_num_rays * sizeof(Ray));
     g_buffer->region_indices = (int*)malloc(num_ray_groups * max_num_rays * sizeof(int));
     g_buffer->ray_counts = (int*)malloc(num_ray_groups * sizeof(int));
 
+    RegroupBuffer* temp_buffer = (RegroupBuffer*) malloc(sizeof(RegroupBuffer));
+    cudaMemcpy(temp_buffer, g_buffer_cuda, sizeof(RegroupBuffer),
+               cudaMemcpyDeviceToHost);
+
     DEBUG(DB_HOST, std::cout << "Copying buffer from device to host" << std::endl);
-    cudaMemcpy(g_buffer->rays, g_buffer_cuda->rays, num_ray_groups * max_num_rays * sizeof(Ray),
+    cudaMemcpy(g_buffer->rays, temp_buffer->rays, num_ray_groups * max_num_rays * sizeof(Ray),
                cudaMemcpyDeviceToHost);
-    cudaMemcpy(g_buffer->region_indices, g_buffer_cuda->region_indices, num_ray_groups * max_num_rays * sizeof(int),
+    cudaMemcpy(g_buffer->region_indices, temp_buffer->region_indices, num_ray_groups * max_num_rays * sizeof(int),
                cudaMemcpyDeviceToHost);
-    cudaMemcpy(g_buffer->ray_counts, g_buffer_cuda->ray_counts, num_ray_groups * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(g_buffer->ray_counts, temp_buffer->ray_counts, num_ray_groups * sizeof(int), cudaMemcpyDeviceToHost);
+
+    printf("HOST: printing ray_counts\n");
+    for (int i = 0; i < num_ray_groups; i++){
+        printf("%d: %d\n", i, g_buffer->ray_counts[i]);
+    }
 
     DEBUG(DB_HOST, std::cout << "Done" << std::endl);
     return;
@@ -507,12 +534,15 @@ __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double*
             DEBUG(DB_HOST, std::cout << "It has " << region_groups[region_index].size() << " ray groups" << std::endl);
 
             // Only do things if the region has ray groups
-            if (cur_region_group.size() > 0)
+            int cur_region_group_size = cur_region_group.size();
+            if (cur_region_group_size > 0)
             {
                 active_rays = true;
                 RegroupBuffer* g_buffer; // empty host regroup buffer. Will be filled in by run_region_group
+                DEBUG(DB_HOST, std::cout << "cur_region_group.size() before run region group" << cur_region_group.size() << std::endl);
                 run_region_group(cur_region_group, region_index, densities, doses, N, M, g_buffer);      // run group
-                regroup(region_groups, g_buffer, cur_region_group[0].max_size, cur_region_group.size()); // regroup
+                DEBUG(DB_HOST, std::cout << "cur_region_group.size() after run region group" << cur_region_group.size() << std::endl);
+                regroup(region_groups, g_buffer, cur_region_group[0].max_size, cur_region_group_size); // regroup
                 free(g_buffer); // free host buffer
             }
         }
