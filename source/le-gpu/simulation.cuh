@@ -55,11 +55,11 @@ struct RegroupBuffer
 // essentially CPU is stagger writing
 struct DoseBuffer
 {
-    int section_size;    // how much space is allocated to each section. max number of pixels a ray can travel in a region
-                                                    // (this is the number of pixels in the region diagonal * number of rays right?)
-    double *energy_deposited;         // energy deposited to a pixel
-    Pixel *pixel_traversed;       // pixel traversed by single ray where energy was deposited
-    int* pixel_counts;     // total count of pixels traversed by all rays in a ray group
+    int section_size; // how much space is allocated to each section. max number of pixels a ray can travel in a region
+                      // (this is the number of pixels in the region diagonal * number of rays right?)
+    double* energy_deposited; // energy deposited to a pixel
+    Pixel* pixel_traversed;   // pixel traversed by single ray where energy was deposited
+    int* pixel_counts;        // total count of pixels traversed by all rays in a ray group
 };
 
 ////////// GRID INITIALIZATION //////////
@@ -133,32 +133,35 @@ __device__ void
 transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N);
 
 /// Evolve all active rays in group by one step, return the number of rays evolved
-__device__ int evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer);
+__device__ int
+evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda);
 
 /// Evolve all rays in group until complete, i.e. none are active
-__device__ void evolve_to_completion(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer);
+__device__ void evolve_to_completion(
+    RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda);
 
 /// Kernel function: Run each thread group in the given region group array in parallel,
 //  rays within each thread group are run in serial
 __global__ void run_rays(RayGroup* region_group_arr,
                          int region_group_arr_size,
                          int region_index,
-                         Region current_region,
                          double* densities,
                          double* doses,
                          int N,
                          int M,
-                         RegroupBuffer* g_buffer);
+                         RegroupBuffer* g_buffer_cuda);
 
 ////////// REGION GROUP RUNNING AND PROCESSING //////////
 // Use data in regroup buffer to add vectors to correct region group
-__host__ void regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups);
+__host__ void
+regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups);
 
 // allocate regroup buffer on device
-__host__ void init_regroup_buffer_cuda(RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups);
+__host__ void init_regroup_buffer_cuda(RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 // allocate regroup buffer on host and copy device's regroup buffer to host's version
-__host__ void init_regroup_buffer(RegroupBuffer* g_buffer, RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups);
+__host__ void
+copy_regroup_buffer_host(RegroupBuffer* g_buffer, RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 /// Get list of linear indices for traversing L x L array of tasks in diagonal order
 //  e.g. [0,1,3,2,4,6,5,7,8] for 3 x 3
@@ -169,7 +172,12 @@ __host__ void
 run_region_groups(std::vector<RegionGroup>& region_groups, double* densities, double* doses, int N, int M);
 
 /// Run each ray group within a single region group on its own thread
-__host__ void
-run_region_group(RegionGroup& region_group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer *g_buffer);
+__host__ void run_region_group(RegionGroup& region_group,
+                               int region_index,
+                               double* densities,
+                               double* doses,
+                               int N,
+                               int M,
+                               RegroupBuffer* g_buffer);
 
 #endif
