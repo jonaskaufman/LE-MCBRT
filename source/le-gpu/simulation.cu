@@ -317,6 +317,8 @@ __device__ int evolve_rays(
             if (r->get_current_energy() < PARAM_EPSILON || out_of_bounds(r->get_current_pixel(), N))
             {
                 r->deactivate();
+                printf("thread index: %d, Ray deactivated for leaving the grid or running out of energy\n");
+                continue;
             }
 
             // Check if the ray is still in the region
@@ -333,6 +335,7 @@ __device__ int evolve_rays(
                 g_buffer_cuda->region_indices[buffer_index] =
                     new_region_index;                      // add destination region index to buffer
                 g_buffer_cuda->ray_counts[thread_index]++; // update buffer size
+                printf("Ray added to buffer\n");
             }
         }
     }
@@ -416,7 +419,7 @@ regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int ma
 }
 
 // allocate a regroup buffer on device
-__host__ void init_regroup_buffer_cuda(RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups)
+__host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups)
 {
     DEBUG(DB_HOST, std::cout << "Initializing regroup buffer on device" << std::endl);
     // Need to allocate device memory for the members of struct BEFORE copying struct
@@ -447,7 +450,7 @@ __host__ void init_regroup_buffer_cuda(RegroupBuffer* g_buffer_cuda, int max_num
 
 // allocate a regroup buffer on host and copy the contents of device's regroup buffer to it
 __host__ void
-copy_regroup_buffer_host(RegroupBuffer* g_buffer, RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups)
+copy_regroup_buffer_host(RegroupBuffer* &g_buffer, RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups)
 {
     g_buffer = (RegroupBuffer*)malloc(sizeof(RegroupBuffer));
     g_buffer->rays = (Ray*)malloc(num_ray_groups * max_num_rays * sizeof(Ray));
@@ -534,7 +537,7 @@ __host__ void run_region_group(RegionGroup& region_group,
                                double* doses,
                                int N,
                                int M,
-                               RegroupBuffer* g_buffer)
+                               RegroupBuffer* &g_buffer)
 {
     // Set device memory limits
     size_t heap_limit = 1 << 26; // default 8MB, this sets to 64 MB

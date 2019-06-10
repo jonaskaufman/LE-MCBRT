@@ -157,11 +157,11 @@ __host__ void
 regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups);
 
 // allocate regroup buffer on device
-__host__ void init_regroup_buffer_cuda(RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups);
+__host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 // allocate regroup buffer on host and copy device's regroup buffer to host's version
 __host__ void
-copy_regroup_buffer_host(RegroupBuffer* g_buffer, RegroupBuffer* g_buffer_cuda, int max_num_rays, int num_ray_groups);
+copy_regroup_buffer_host(RegroupBuffer* &g_buffer, RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 /// Get list of linear indices for traversing L x L array of tasks in diagonal order
 //  e.g. [0,1,3,2,4,6,5,7,8] for 3 x 3
@@ -178,6 +178,6 @@ __host__ void run_region_group(RegionGroup& region_group,
                                double* doses,
                                int N,
                                int M,
-                               RegroupBuffer* g_buffer);
+                               RegroupBuffer* &g_buffer_cuda);
 
 #endif
