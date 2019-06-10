@@ -278,7 +278,6 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
     return;
 }
 
-// TODO needs to take pointer to a RegroupBuffer as argument
 __device__ int evolve_rays(
     RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda)
 {
@@ -328,7 +327,6 @@ __device__ int evolve_rays(
                 printf("thread index: %d, Ray is out of region, deactivating and adding to buffer\n", thread_index);
                 r->deactivate();
 
-                // TODO add it to buffer (calling it g_buff, a ptr to  RegroupBuffer)
                 int buffer_index = thread_index * g_buffer_cuda->section_size +
                                    g_buffer_cuda->ray_counts[thread_index]; // this thread's next index in buffer
                 g_buffer_cuda->rays[buffer_index] = *r;                     // add ray to buffer
@@ -419,7 +417,7 @@ regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int ma
 }
 
 // allocate a regroup buffer on device
-__host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups)
+__host__ void init_regroup_buffer_cuda(RegroupBuffer*& g_buffer_cuda, int max_num_rays, int num_ray_groups)
 {
     DEBUG(DB_HOST, std::cout << "Initializing regroup buffer on device" << std::endl);
     // Need to allocate device memory for the members of struct BEFORE copying struct
@@ -450,18 +448,23 @@ __host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_nu
 
 // allocate a regroup buffer on host and copy the contents of device's regroup buffer to it
 __host__ void
-copy_regroup_buffer_host(RegroupBuffer* &g_buffer, RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups)
+copy_regroup_buffer_host(RegroupBuffer*& g_buffer, RegroupBuffer*& g_buffer_cuda, int max_num_rays, int num_ray_groups)
 {
+    DEBUG(DB_HOST, std::cout << "Allocating memory for buffer on host" << std::cout);
     g_buffer = (RegroupBuffer*)malloc(sizeof(RegroupBuffer));
     g_buffer->rays = (Ray*)malloc(num_ray_groups * max_num_rays * sizeof(Ray));
     g_buffer->region_indices = (int*)malloc(num_ray_groups * max_num_rays * sizeof(int));
     g_buffer->ray_counts = (int*)malloc(num_ray_groups * sizeof(int));
 
+    DEBUG(DB_HOST, std::cout << "Copying buffer from device to host" << std::endl);
     cudaMemcpy(g_buffer->rays, g_buffer_cuda->rays, num_ray_groups * max_num_rays * sizeof(Ray),
                cudaMemcpyDeviceToHost);
     cudaMemcpy(g_buffer->region_indices, g_buffer_cuda->region_indices, num_ray_groups * max_num_rays * sizeof(int),
                cudaMemcpyDeviceToHost);
     cudaMemcpy(g_buffer->ray_counts, g_buffer_cuda->ray_counts, num_ray_groups * sizeof(int), cudaMemcpyDeviceToHost);
+
+    DEBUG(DB_HOST, std::cout << "Done" << std::endl);
+    return;
 }
 
 __host__ std::vector<int> get_forward_schedule(int L)
@@ -484,49 +487,35 @@ __host__ std::vector<int> get_forward_schedule(int L)
 
 __host__ void run_region_groups(std::vector<RegionGroup>& region_groups, double* densities, double* doses, int N, int M)
 {
-    int L = N / M;                                       // number of regions per side
-    std::vector<int> schedule = get_forward_schedule(L); // linear indices of regions in diagonal order
+    // Get the schedule
+    int L = N / M;                                            // number of regions per side
+    std::vector<int> forward_sched = get_forward_schedule(L); // linear indices of regions in diagonal order
+    std::vector<int> full_sched = forward_sched;
+    full_sched.insert(full_sched.end(), forward_sched.rbegin(), forward_sched.rend()); // concat forward and reverse
 
-    int rays_remaining = 1;
-    while (rays_remaining > 0) // TODO: add multiple passes, checking for when all rays are done
+    // Go through schedule in passes until complete
+    bool active_rays = true;
+    while (active_rays) // keep going until no rays are left
     {
-        // Forward pass
-        for (std::vector<int>::iterator f_it = schedule.begin(); f_it != schedule.end(); f_it++)
+        active_rays = false;
+        for (std::vector<int>::iterator it = full_sched.begin(); it != full_sched.end(); it++)
         {
 
-            int region_index = *f_it;
-
+            int region_index = *it;
             RegionGroup& cur_region_group = region_groups[region_index]; // current region group REFERENCE
-            DEBUG(DB_HOST, std::cout << "Forward pass. Running region group " << region_index << std::endl);
+            DEBUG(DB_HOST, std::cout << "Running region group " << region_index << std::endl);
             DEBUG(DB_HOST, std::cout << "It has " << region_groups[region_index].size() << " ray groups" << std::endl);
 
             // Only do things if the region has ray groups
             if (cur_region_group.size() > 0)
             {
+                active_rays = true;
                 RegroupBuffer* g_buffer; // empty host regroup buffer. Will be filled in by run_region_group
                 run_region_group(cur_region_group, region_index, densities, doses, N, M, g_buffer);      // run group
                 regroup(region_groups, g_buffer, cur_region_group[0].max_size, cur_region_group.size()); // regroup
                 free(g_buffer); // free host buffer
             }
         }
-
-        // Reverse pass
-        for (std::vector<int>::reverse_iterator r_it = schedule.rbegin(); r_it != schedule.rend(); r_it++)
-        {
-            int region_index = *r_it;
-            DEBUG(DB_HOST, std::cout << "Reverse pass. Running region group " << region_index << std::endl);
-            DEBUG(DB_HOST, std::cout << "It has " << region_groups[region_index].size() << " ray groups" << std::endl);
-            /*
-             RegionGroup cur_region_group = region_groups[region_index];
-             RegroupBuffer* g_buffer;
-
-             run_region_group(cur_region_group, region_index, densities, doses, N, M, g_buffer);
-             regroup(region_groups, g_buffer, cur_region_group[0].max_size, cur_region_group.size());
-             free(g_buffer);
-         */
-        }
-
-        rays_remaining = 0;
     }
     return;
 }
@@ -537,7 +526,7 @@ __host__ void run_region_group(RegionGroup& region_group,
                                double* doses,
                                int N,
                                int M,
-                               RegroupBuffer* &g_buffer)
+                               RegroupBuffer*& g_buffer)
 {
     // Set device memory limits
     size_t heap_limit = 1 << 26; // default 8MB, this sets to 64 MB
@@ -581,7 +570,6 @@ __host__ void run_region_group(RegionGroup& region_group,
     RegroupBuffer* g_buffer_cuda;                                          // empty device regroup buff0er
     init_regroup_buffer_cuda(g_buffer_cuda, max_num_rays, num_ray_groups); // allocate device regroup buffer
 
-    // TODO make sure there are enough threads to handle all ray groups
     // Run thread groups in parallel
     int grid_size = 1 + num_ray_groups / 1024; // 1024 is max threads in a block
     int block_size = 1 + num_ray_groups / grid_size;
@@ -593,14 +581,13 @@ __host__ void run_region_group(RegionGroup& region_group,
     // Wait for GPU computation to finish
     cudaDeviceSynchronize();
 
-    // Free device memory
-    // TODO free ray group pointers
-    cudaFree(region_group_cuda_arr);
-
-    // TODO copy g_buffer back to host buffer
+    // Copy g_buffer back to host buffer
     copy_regroup_buffer_host(g_buffer, g_buffer_cuda, max_num_rays,
                              num_ray_groups); // copy g_buffer back to host buffer
+    // Free device memory
+    // TODO Free ray group pointers first?
     cudaFree(g_buffer_cuda);
+    cudaFree(region_group_cuda_arr);
 
     return;
 }

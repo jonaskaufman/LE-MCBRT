@@ -178,6 +178,6 @@ __host__ void run_region_group(RegionGroup& region_group,
                                double* doses,
                                int N,
                                int M,
-                               RegroupBuffer* &g_buffer_cuda);
+                               RegroupBuffer* &g_buffer);
 
 #endif
