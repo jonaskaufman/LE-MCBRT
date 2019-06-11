@@ -1,11 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import sys
 
 # Plot parameters
 colormap = "plasma"
-log_scale_dose = True
+log_scale_dose = False
 log_zero_offset = 0.000000001
+save = False
+DPI = 300;
+
+if 'log' in sys.argv:
+    log_scale_dose = True
+
+if 'save' in sys.argv:
+    save = True
 
 # Nice colorbars (from https://joseph-long.com/writing/colorbars/)
 def colorbar(mappable):
@@ -25,7 +34,7 @@ doses = np.loadtxt(doses_path, delimiter=',')
 if log_scale_dose: doses = np.log(doses + log_zero_offset)
 
 # Plot data
-f, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
+f, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(6, 3))
 
 ax1.set_title("density")
 im1 = ax1.imshow(densities, cmap=colormap, vmin=0.0, vmax=1.0)
@@ -41,5 +50,8 @@ colorbar(im2)
 ax2.axis('off')
 
 plt.tight_layout()
-plt.show()
-# TODO add save to file
+if save:
+    plt.savefig('results.png', dpi=DPI)
+else:
+    plt.show()
+
