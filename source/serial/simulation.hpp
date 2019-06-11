@@ -1,7 +1,7 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-#include "parameters.hpp"
+#include "../parameters.hpp"
 #include "ray.hpp"
 
 #include <chrono>
@@ -21,24 +21,24 @@ public:
     Simulation() = delete;
 
     /// Constructor
-    Simulation(const int N);
+    Simulation(int N);
 
     /// Initialize densities randomly between 0 and 1
     void initialize_densities_random();
 
     /// Initialize densities to constant value
-    void initialize_densities_constant(const double density);
+    void initialize_densities_constant(double density);
 
     /// Initialize densities to 2D Gaussian centered on the grid,
     //  with spread (std dev) given as fraction of grid size
-    void initialize_densities_centered_gaussian(const double max_density, const double spread);
+    void initialize_densities_centered_gaussian(double max_density, double spread);
 
     /// Initialize densities with multiple Gaussians at random positions,
     //  with highest resulting density normalized to given max_density
-    void initialize_densities_random_gaussians(const int n_gaussians, const double max_density, const double spread);
+    void initialize_densities_random_gaussians(int n_gaussians, double max_density, double spread);
 
     /// Run simulation for a given number of primary rays, in serial
-    void run_serial(const int num_primary_rays);
+    void run_serial(int num_primary_rays, int batch_size);
 
     /// Write data
     void write_densities_to_file(const std::string& filename);

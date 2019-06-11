@@ -1,5 +1,5 @@
 all:
-	g++ -std=c++11 *.cpp -o run_serial
+	g++ -std=c++11 *.cpp -o serial-run
 
 clean:
-	rm -rf *.csv run_serial
+	rm -rf *.csv serial-run

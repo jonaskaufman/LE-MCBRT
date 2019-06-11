@@ -2,7 +2,7 @@
 #define PARAMETERS_H
 
 /// Simulation parameters
-#define PARAM_D 1.0                  /// source distance as relative to grid size
+#define PARAM_D 1.0                  /// source distance relative to grid size
 #define PARAM_MEAN 0.0               /// source angle mean
 #define PARAM_SIGMA 0.1              /// source angle std dev in radians
 #define PARAM_E0 100.0               /// initial primary ray energy
@@ -46,8 +46,8 @@ enum class PIXEL_EDGE
 #define DB_EVOLVE_PRI 4 // evolve primary ray
 #define DB_EVOLVE_SEC 5 // evolve secondary ray
 #define DB_TRACE 6      // trace ray from pixel to pixel
-#define DB_GPU 7        // base GPU version
-#define DB_HOST 8       // host debug statements
+#define DB_HOST 7       // host debug statements
+#define DB_GPU 8        // device debug statements
 
 #endif
 

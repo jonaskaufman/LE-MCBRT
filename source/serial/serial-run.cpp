@@ -1,6 +1,7 @@
-#include "parameters.hpp"
+#include "../parameters.hpp"
 #include "simulation.hpp"
 
+#include <chrono>
 #include <iostream>
 #include <stdlib.h>
 
@@ -124,14 +125,25 @@ int main(int argc, char** argv)
     DEBUG(DB_GENERAL, std::cout << "Densities initialized" << std::endl << std::endl);
 
     // Write densities
+    std::cout << "Writing densities" << std::endl;
     s.write_densities_to_file("densities.csv");
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     // Run a given number of rays
-    s.run_serial(ray_count);
+    std::cout << "Spawning and running " << ray_count << " primary rays" << std::endl;
+    int batch_size = 10000;
+    s.run_serial(ray_count, batch_size);
+
+    auto finish = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
+    std::cout << "Elapsed time: " << elapsed.count() << " s" << std::endl;
 
     // Write result
+    std::cout << "Writing doses" << std::endl;
     s.write_doses_to_file("doses.csv");
 
+    std::cout << "All done" << std::endl;
     return 0;
 }
 

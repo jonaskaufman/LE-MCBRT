@@ -1,6 +1,6 @@
 #include "simulation.hpp"
 
-Simulation::Simulation(const int N) : m_N(N)
+Simulation::Simulation(int N) : m_N(N)
 {
     for (int i = 0; i < m_N; i++)
     {
@@ -27,7 +27,7 @@ void Simulation::initialize_densities_random()
     return;
 }
 
-void Simulation::initialize_densities_constant(const double density)
+void Simulation::initialize_densities_constant(double density)
 {
     for (int i = 0; i < m_N; i++)
     {
@@ -39,7 +39,7 @@ void Simulation::initialize_densities_constant(const double density)
     return;
 }
 
-void Simulation::initialize_densities_centered_gaussian(const double max_density, const double spread)
+void Simulation::initialize_densities_centered_gaussian(double max_density, double spread)
 {
     for (int i = 0; i < m_N; i++)
     {
@@ -55,9 +55,9 @@ void Simulation::initialize_densities_centered_gaussian(const double max_density
     return;
 }
 
-void Simulation::initialize_densities_random_gaussians(const int n_gaussians,
-                                                       const double max_density,
-                                                       const double spread)
+void Simulation::initialize_densities_random_gaussians(int n_gaussians,
+                                                       double max_density,
+                                                       double spread)
 {
     double std_dev = spread * m_N;
     double highest = 0;
@@ -90,18 +90,26 @@ void Simulation::initialize_densities_random_gaussians(const int n_gaussians,
     return;
 }
 
-void Simulation::run_serial(int num_primary_rays)
+void Simulation::run_serial(int num_primary_rays, int batch_size)
 {
-    // TODO: Would it be helpful to add batching? i.e. spawn R rays, evolve them, repeat
-    DEBUG(DB_INIT_PRI, std::cout << "Spawning " << num_primary_rays << " primary rays..." << std::endl);
-    for (int i = 0; i < num_primary_rays; i++)
+    int num_batches = 1 + num_primary_rays / batch_size;
+    int rays_added = 0;
+    for (int b = 0; b < num_batches; b++)
     {
-        _spawn_primary_ray();
+        DEBUG(DB_INIT_PRI, std::cout << "Spawning " << num_primary_rays << " primary rays..." << std::endl);
+        for (int i = 0; i < batch_size; i++)
+        {
+            if (rays_added < num_primary_rays)
+            {
+                _spawn_primary_ray();
+                rays_added++;
+            }
+        }
+        DEBUG(DB_INIT_PRI, std::cout << "Done, " << m_rays.size() << " rays added" << std::endl << std::endl);
+        DEBUG(DB_GENERAL, std::cout << "Evolving rays..." << std::endl)
+        _evolve_to_completion();
+        DEBUG(DB_GENERAL, std::cout << "Done" << std::endl);
     }
-    DEBUG(DB_INIT_PRI, std::cout << "Done, " << m_rays.size() << " rays added" << std::endl << std::endl);
-    DEBUG(DB_GENERAL, std::cout << "Evolving rays..." << std::endl)
-    _evolve_to_completion();
-    DEBUG(DB_GENERAL, std::cout << "Done" << std::endl);
     return;
 }
 
@@ -144,11 +152,11 @@ double Simulation::_random_source_angle(bool normal)
         double angle = normal_dist(random_engine);
 
         // Normalize angle
-        if (angle < 0)
+        while (angle < 0.0)
         {
             angle += 2 * M_PI;
         }
-        else if (angle >= 2 * M_PI)
+        while (angle >= 2 * M_PI)
         {
             angle -= 2 * M_PI;
         }
@@ -303,7 +311,7 @@ int Simulation::_evolve_rays()
             }
 
             // Deactivate ray if out of energy or outside of the grid bounds
-            if (r->get_current_energy() < PARAM_MINERGY || _out_of_bounds(r->get_current_pixel()))
+            if (r->get_current_energy() < PARAM_EPSILON || _out_of_bounds(r->get_current_pixel()))
             {
                 DEBUG(DB_EVOLVE_SEC, std::cout << "Ray " << i << " is out of energy or bounds, deactivating"
                                                << std::endl
@@ -323,7 +331,7 @@ void Simulation::_evolve_to_completion()
         int prev_num_rays = m_rays.size();
         rays_evolved = _evolve_rays();
         DEBUG(DB_GENERAL, std::cout << rays_evolved << " rays evolved" << std::endl);
-        DEBUG(DB_GENERAL, std::cout << (m_rays.size() - prev_num_rays) << " rays added" << std::endl << std::endl )
+        DEBUG(DB_GENERAL, std::cout << (m_rays.size() - prev_num_rays) << " rays added" << std::endl << std::endl)
     }
 
     // Clear out the ray vector

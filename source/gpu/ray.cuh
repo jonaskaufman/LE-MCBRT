@@ -7,7 +7,7 @@
 #define CUDA_CALLABLE_MEMBER
 #endif
 
-#include "parameters.hpp"
+#include "../parameters.hpp"
 
 #include <iostream>
 #include <math.h>

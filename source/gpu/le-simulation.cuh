@@ -1,7 +1,7 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-#include "parameters.hpp"
+#include "../parameters.hpp"
 #include "ray.cuh"
 
 // TODO do we need to include all these?
