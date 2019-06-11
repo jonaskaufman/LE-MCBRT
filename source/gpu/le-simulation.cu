@@ -1,4 +1,4 @@
-#include "simulation.cuh"
+#include "le-simulation.cuh"
 #include <stdio.h>
 
 

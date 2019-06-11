@@ -1,4 +1,4 @@
-#include "simulation.cuh"
+#include "base-simulation.cuh"
 #include <stdio.h>
 
 __host__ void initialize_doses(double* doses, int N)
@@ -305,7 +305,7 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
             }
 
             // Deactivate ray if out of energy or outside of the grid bounds
-            if (r->get_current_energy() < PARAM_MINERGY || out_of_bounds(r->get_current_pixel(), N))
+            if (r->get_current_energy() < PARAM_EPSILON || out_of_bounds(r->get_current_pixel(), N))
             {
                 // DEBUG(DBevolve_SEC, std::cout << "Ray " << i << " is out of energy or bounds, deactivating"
                 //                                               << std::endl
