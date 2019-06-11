@@ -4,10 +4,10 @@
 objects = simulation.o ray.o
 
 all: $(objects)
-	nvcc -arch=sm_30 $(objects) -g -o simulation.x
+	nvcc -arch=sm_30 -Xptxas -O1 $(objects) -g -o simulation.x
 
 %.o : %.cu
-	nvcc -std=c++11 -lcurand -x cu -arch=sm_30 -I. -dc $< -o $@	
+	nvcc -std=c++11 -Xptxas -O1 -lcurand -x cu -arch=sm_30 -I. -dc $< -o $@	
 
 clean:
 	rm -f *.o *.x *.csv

@@ -18,6 +18,17 @@
 //#include <utility>
 #include <vector>
 
+#define error_check(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+
 ////////// STRUCTS AND TYPEDEFS //////////
 
 /// Struct to hold and manage an array of rays
@@ -134,11 +145,11 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
 
 /// Evolve all active rays in group by one step, return the number of rays evolved
 __device__ int
-evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda);
+evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda, int num_ray_groups);
 
 /// Evolve all rays in group until complete, i.e. none are active
 __device__ void evolve_to_completion(
-    RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda);
+    RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda, int num_ray_groups);
 
 /// Kernel function: Run each thread group in the given region group array in parallel,
 //  rays within each thread group are run in serial
@@ -154,7 +165,7 @@ __global__ void run_rays(RayGroup* region_group_arr,
 ////////// REGION GROUP RUNNING AND PROCESSING //////////
 // Use data in regroup buffer to add vectors to correct region group
 __host__ void
-regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int max_num_rays, int num_ray_groups);
+regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int num_ray_groups);
 
 // allocate regroup buffer on device
 __host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups);
