@@ -5,7 +5,7 @@ EXEC = base-run.x le-run.x
 
 all: $(EXEC)
 
-%-run.x: %-simulation.o ray.o
+%-run.x: %-simulation.o %-main.o ray.o
 	nvcc -arch=sm_30 $^ -g -o $@
 
 %.o : %.cu

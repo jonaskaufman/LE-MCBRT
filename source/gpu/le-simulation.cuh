@@ -5,7 +5,6 @@
 #include "ray.cuh"
 
 // TODO do we need to include all these?
-#include <chrono>
 #include <cmath>
 #include <curand.h>
 #include <curand_kernel.h>
@@ -14,20 +13,21 @@
 #include <random>
 #include <thread>
 #include <time.h>
-//#include <tuple>
-//#include <utility>
 #include <vector>
 
-#define error_check(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+#define error_check(ans)                                                                                               \
+    {                                                                                                                  \
+        gpuAssert((ans), __FILE__, __LINE__);                                                                          \
+    }
+inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
 {
-   if (code != cudaSuccess) 
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort)
+            exit(code);
+    }
 }
-
 
 ////////// STRUCTS AND TYPEDEFS //////////
 
@@ -101,9 +101,10 @@ __host__ void write_to_csv_file(double* grid_data, int N, const std::string& fil
 ////////// RANDOMIZATION //////////
 
 /// Random distributions
-std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
-std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound, upperbound}
-std::normal_distribution<double> normal_dist{PARAM_MEAN, PARAM_SIGMA}; // normal distribribution, pass {mean, stddev}
+// std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
+// std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound,
+// upperbound} std::normal_distribution<double> normal_dist{PARAM_MEAN, PARAM_SIGMA}; // normal distribribution, pass
+// {mean, stddev}
 
 __device__ void init_curand_state(curandState_t* state);    // initialize curand state based on clock, thread id
 __device__ double uniform_angle_dist(curandState_t* state); // uniform between 0 and 2 pi
@@ -144,12 +145,24 @@ __device__ void
 transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* densities, double* doses, int N);
 
 /// Evolve all active rays in group by one step, return the number of rays evolved
-__device__ int
-evolve_rays(RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda, int num_ray_groups);
+__device__ int evolve_rays(RayGroup* group,
+                           int region_index,
+                           double* densities,
+                           double* doses,
+                           int N,
+                           int M,
+                           RegroupBuffer* g_buffer_cuda,
+                           int num_ray_groups);
 
 /// Evolve all rays in group until complete, i.e. none are active
-__device__ void evolve_to_completion(
-    RayGroup* group, int region_index, double* densities, double* doses, int N, int M, RegroupBuffer* g_buffer_cuda, int num_ray_groups);
+__device__ void evolve_to_completion(RayGroup* group,
+                                     int region_index,
+                                     double* densities,
+                                     double* doses,
+                                     int N,
+                                     int M,
+                                     RegroupBuffer* g_buffer_cuda,
+                                     int num_ray_groups);
 
 /// Kernel function: Run each thread group in the given region group array in parallel,
 //  rays within each thread group are run in serial
@@ -164,15 +177,14 @@ __global__ void run_rays(RayGroup* region_group_arr,
 
 ////////// REGION GROUP RUNNING AND PROCESSING //////////
 // Use data in regroup buffer to add vectors to correct region group
-__host__ void
-regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int num_ray_groups);
+__host__ void regroup(std::vector<RegionGroup>& region_groups, RegroupBuffer* g_buffer, int num_ray_groups);
 
 // allocate regroup buffer on device
-__host__ void init_regroup_buffer_cuda(RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups);
+__host__ void init_regroup_buffer_cuda(RegroupBuffer*& g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 // allocate regroup buffer on host and copy device's regroup buffer to host's version
 __host__ void
-copy_regroup_buffer_host(RegroupBuffer* &g_buffer, RegroupBuffer* &g_buffer_cuda, int max_num_rays, int num_ray_groups);
+copy_regroup_buffer_host(RegroupBuffer*& g_buffer, RegroupBuffer*& g_buffer_cuda, int max_num_rays, int num_ray_groups);
 
 /// Get list of linear indices for traversing L x L array of tasks in diagonal order
 //  e.g. [0,1,3,2,4,6,5,7,8] for 3 x 3
@@ -189,6 +201,6 @@ __host__ void run_region_group(RegionGroup& region_group,
                                double* doses,
                                int N,
                                int M,
-                               RegroupBuffer* &g_buffer);
+                               RegroupBuffer*& g_buffer);
 
 #endif

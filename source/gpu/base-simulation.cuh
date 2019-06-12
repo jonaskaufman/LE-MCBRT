@@ -54,8 +54,9 @@ initialize_densities_random_gaussians(double* densities, int N, int n_gaussians,
 __host__ void write_to_csv_file(double* grid_data, int N, const std::string& filename);
 
 /// Random distributions
-std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
-std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound, upperbound}
+// std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
+// std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};    // uniform distribution, pass {lowerbound,
+// upperbound}
 
 __device__ void init_curand_state(curandState_t* state); // initialize curand state based on clock, thread id
 
@@ -91,5 +92,8 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 
 /// Run simulation for a given number  primary rays, in serial
 __device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N);
+
+/// Kernel function: Run num_primary_rays with one primary ray per thread
+__global__ void run_rays(int num_primary_rays, double* densities, double* doses, int N);
 
 #endif

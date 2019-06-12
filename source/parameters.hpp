@@ -6,12 +6,15 @@
 #define PARAM_MEAN 0.0               /// source angle mean
 #define PARAM_SIGMA 0.1              /// source angle std dev in radians
 #define PARAM_E0 100.0               /// initial primary ray energy
-#define PARAM_A 2.0                  /// primary ray interaction probability scaling
+#define PARAM_A 3.0                  /// primary ray interaction probability scaling
 #define PARAM_F 0.05                 /// primary ray interaction energy deposit fraction
-#define PARAM_G 1.0                  /// secondary ray deposition constant
+#define PARAM_G 0.1                  /// secondary ray deposition constant
 #define PARAM_KS 10                  /// number of secondary rays to spawn after interaction
 #define PARAM_EPSILON 0.000000000001 /// tolerance for zero-checking
 
+/// GPU parameters
+#define GPU_BLOCK_SIZE 1024    /// threads per block
+#define GPU_HEAP_LIMIT 1 << 26 /// device heap limit
 /// Label the pixel edges
 enum class PIXEL_EDGE
 {

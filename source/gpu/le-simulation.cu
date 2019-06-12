@@ -1,6 +1,14 @@
 #include "le-simulation.cuh"
 #include <stdio.h>
 
+// Needed to move this to .cu
+std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
+
+std::uniform_real_distribution<double> uniform_dist{0.0, 1.0}; // uniform distribution, pass {lowerbound, upperbound}
+
+std::normal_distribution<double> normal_dist{PARAM_MEAN, PARAM_SIGMA}; // normal distribribution, pass {mean, stddev}
+
+
 ////////// GRID INITIALIZATION //////////
 
 __host__ void initialize_doses(double* doses, int N)
@@ -108,7 +116,6 @@ __host__ void write_to_csv_file(double* grid_data, int N, const std::string& fil
 }
 
 ////////// RANDOMIZATION //////////
-
 __device__ void init_curand_state(curandState_t* state)
 {
     // Initialize random kernel
@@ -676,8 +683,7 @@ __host__ void run_region_group(RegionGroup& region_group,
                                RegroupBuffer*& g_buffer)
 {
     // Set device memory limits
-    size_t heap_limit = 1 << 26; // default 8MB, this sets to 64 MB
-    cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_limit);
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, GPU_HEAP_LIMIT);
 
     // First copy rays to ray groups on device, done by just replacing host pointers with device pointers
     int num_ray_groups = region_group.size(); // number of ray groups in current region group
@@ -718,8 +724,8 @@ __host__ void run_region_group(RegionGroup& region_group,
     init_regroup_buffer_cuda(g_buffer_cuda, max_num_rays, num_ray_groups); // allocate device regroup buffer
 
     // Run thread groups in parallel
-    int grid_size = 1 + num_ray_groups / 1024; // 1024 is max threads in a block
-    int block_size = 1 + num_ray_groups / grid_size;
+    int grid_size = max(1, num_ray_groups / GPU_BLOCK_SIZE);
+    int block_size = GPU_BLOCK_SIZE;
     DEBUG(DB_HOST,
           std::cout << "Calling run_rays with grid_size,block_size " << grid_size << "," << block_size << std::endl);
     run_rays<<<grid_size, block_size>>>(region_group_cuda_arr, num_ray_groups, region_index, densities, doses, N, M,
@@ -739,7 +745,7 @@ __host__ void run_region_group(RegionGroup& region_group,
 
     return;
 }
-
+/*
 int main(void)
 {
     int N = 1000;                 // grid size in pixels per side
@@ -762,38 +768,6 @@ int main(void)
     initialize_doses(doses, N);
     DEBUG(DB_HOST, std::cout << "Writing densities" << std::endl);
     write_to_csv_file(densities, N, "densities.csv");
-
-    /*
-    int max_num_rays = PARAM_KS + 1;
-    int num_ray_groups = 10;
-    RegroupBuffer *g_buffer_cuda;
-
-    RegroupBuffer temp; // temporary buffer on host
-    temp.section_size = max_num_rays;
-
-
-    Ray* rays_cuda;
-    cudaMalloc(&rays_cuda, num_ray_groups * max_num_rays * sizeof(Ray));
-    error_check(cudaMemset(rays_cuda, 0, num_ray_groups * max_num_rays * sizeof(Ray)));
-    temp.rays = rays_cuda;
-
-    int* region_indices_cuda;
-    cudaMalloc(&region_indices_cuda, num_ray_groups * max_num_rays * sizeof(int));
-    error_check(cudaMemset(region_indices_cuda, 0, num_ray_groups * max_num_rays * sizeof(int)));
-    temp.region_indices = region_indices_cuda;
-
-    int* ray_counts_cuda;
-    cudaMalloc(&ray_counts_cuda, num_ray_groups * sizeof(int));
-    error_check(cudaMemset(ray_counts_cuda, 0, num_ray_groups * sizeof(int))); // initialize all ray counts to zero
-    temp.ray_counts = ray_counts_cuda;
-
-    cudaMalloc(&g_buffer_cuda, sizeof(RegroupBuffer));
-    error_check(cudaMemcpy(g_buffer_cuda, &temp, sizeof(RegroupBuffer), cudaMemcpyHostToDevice));
-
-
-    RegroupBuffer *dummy2 = (RegroupBuffer *) malloc(sizeof(RegroupBuffer));
-    error_check(cudaMemcpy(dummy2, g_buffer_cuda,  sizeof(RegroupBuffer), cudaMemcpyDeviceToHost));
-    */
 
     // Set up region groups
     int L = N / M;           // number of regions per side
@@ -821,4 +795,4 @@ int main(void)
     DEBUG(DB_HOST, std::cout << "All done" << std::endl);
     return 0;
 }
-
+*/
