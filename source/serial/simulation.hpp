@@ -4,15 +4,8 @@
 #include "../parameters.hpp"
 #include "ray.hpp"
 
-#include <chrono>
 #include <cmath>
-#include <fstream>
-#include <iostream>
 #include <random>
-#include <thread>
-#include <time.h>
-#include <tuple>
-#include <utility>
 #include <vector>
 
 class Simulation

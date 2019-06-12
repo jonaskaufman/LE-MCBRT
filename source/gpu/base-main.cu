@@ -37,10 +37,9 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    // Set up grids
     // NOTE: all 2D arrays unwrapped as 1D arrays/vectors use linear indexing
     // of the form i,j -> i + j * edge_dimension
-
-    // Set up grids
     DEBUG(DB_HOST, std::cout << "Starting simulation, allocating grids" << std::endl);
     double *densities, *doses;
     cudaMallocManaged(&densities, N * N * sizeof(double));
@@ -49,8 +48,8 @@ int main(int argc, char** argv)
     // Initialize densities and doses
     DEBUG(DB_HOST, std::cout << "Initializing doses to zero" << std::endl);
     initialize_doses(doses, N);
-    DEBUG(DB_HOST, std::cout << "Initializing densities" << std::endl);
 
+    DEBUG(DB_HOST, std::cout << "Initializing densities" << std::endl);
     // Initialize densities according to given method
     int init_method_arg = 3;
     switch (argv[init_method_arg][0])
@@ -133,33 +132,48 @@ int main(int argc, char** argv)
     }
     }
 
-    DEBUG(DB_GENERAL, std::cout << "Densities initialized" << std::endl << std::endl);
+    std::cout << "Base-GPU version" << std::endl << std::endl;
+
+    // Print parameters
+    std::cout << "Listing parameters" << std::endl;
+    std::cout << "Grid side length N: " << N << std::endl;
+    std::cout << "Source offset distance D / N: " << PARAM_D << std::endl;
+    std::cout << "Source angle mean, std dev: " << PARAM_MEAN << ", " << PARAM_SIGMA << std::endl;
+    std::cout << "Initial primary ray energy E0: " << PARAM_E0 << std::endl;
+    std::cout << "Interaction probability scaling a: " << PARAM_A << std::endl;
+    std::cout << "Primary ray energy deposit fraction f: " << PARAM_F << std::endl;
+    std::cout << "Secondary ray energy deposit constant g: " << PARAM_G << std::endl;
+    std::cout << "Number of secondary rays per primary k_s: " << PARAM_KS << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Threads per block: " << GPU_BLOCK_SIZE << std::endl;
+    std::cout << std::endl;
 
     // Write densities
     std::cout << "Writing densities" << std::endl;
+    std::cout << std::endl;
     write_to_csv_file(densities, N, "densities.csv");
 
-    // Set up simulation 
-    cudaDeviceSetLimit(cudaLimitMallocHeapSize, GPU_HEAP_LIMIT); 
-    int grid_size = max(1, num_primary_rays / GPU_BLOCK_SIZE); // number of thread blocks
-    int block_size = GPU_BLOCK_SIZE;                             
+    // Run the given number of rays on threads (includes spawning)
+    std::cout << "Spawning and running " << num_primary_rays << " primary rays" << std::endl;
 
-    // TIMER START
-    auto start = std::chrono::high_resolution_clock::now(); 
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, GPU_HEAP_LIMIT); // increase device heap limit
+    int grid_size = 1 + num_primary_rays / GPU_BLOCK_SIZE;       // number of thread blocks
+    int block_size = GPU_BLOCK_SIZE;                             // threads per block
 
-    std::cout << "Spawning and running " << num_primary_rays << " primary rays" << std::endl;    
-    // Run rays on threads (includes spawning)
+    // Start timer
+    auto start = std::chrono::high_resolution_clock::now();
+
     run_rays<<<grid_size, block_size>>>(num_primary_rays, densities, doses, N);
+    cudaDeviceSynchronize(); // wait for GPU computation to finish
 
-    // Wait for GPU computation to finish
-    cudaDeviceSynchronize();
-
-    // TIMER END
+    // Stop timer
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     std::cout << "Elapsed time: " << elapsed.count() << " s" << std::endl;
 
     // Write result
+    std::cout << std::endl;
     std::cout << "Writing doses" << std::endl;
     write_to_csv_file(doses, N, "doses.csv");
 

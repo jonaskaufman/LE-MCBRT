@@ -1,5 +1,9 @@
 #include "simulation.hpp"
 
+#include <cmath>
+#include <fstream>
+#include <iostream>
+
 Simulation::Simulation(int N) : m_N(N)
 {
     for (int i = 0; i < m_N; i++)
@@ -55,9 +59,7 @@ void Simulation::initialize_densities_centered_gaussian(double max_density, doub
     return;
 }
 
-void Simulation::initialize_densities_random_gaussians(int n_gaussians,
-                                                       double max_density,
-                                                       double spread)
+void Simulation::initialize_densities_random_gaussians(int n_gaussians, double max_density, double spread)
 {
     double std_dev = spread * m_N;
     double highest = 0;

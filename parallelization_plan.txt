@@ -1,3 +1,0 @@
-Base:       serial version on CPU (mostly for our own sanity)
-Base_GPU:   non-locality-enhancing version on GPU only
-LE_GPU-CPU: locality-enhancing version with GPU-CPU pipeline

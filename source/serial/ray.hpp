@@ -3,12 +3,8 @@
 
 #include "../parameters.hpp"
 
-#include <iostream>
-#include <math.h>
 #include <string>
-#include <tuple>
 #include <utility>
-#include <vector>
 
 typedef std::pair<int, int> PIXEL;
 
@@ -42,12 +38,12 @@ public:
 
 private:
     /// Full parameterized constructor
-    Ray(const bool &primary,
-        const double &angle,
-        const PIXEL &pixel,
-        const PIXEL_EDGE &edge,
-        const double &edge_dist,
-        const double &energy);
+    Ray(const bool& primary,
+        const double& angle,
+        const PIXEL& pixel,
+        const PIXEL_EDGE& edge,
+        const double& edge_dist,
+        const double& energy);
 
     bool m_active;              /// whether ray is active
     const bool m_primary;       /// whether ray is primary

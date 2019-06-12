@@ -9,12 +9,8 @@
 
 #include "../parameters.hpp"
 
-#include <iostream>
 #include <math.h>
 #include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
 
 struct Pixel
 {

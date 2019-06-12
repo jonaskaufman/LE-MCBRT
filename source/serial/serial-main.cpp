@@ -3,7 +3,7 @@
 
 #include <chrono>
 #include <iostream>
-#include <stdlib.h>
+//#include <stdlib.h>
 
 int main(int argc, char** argv)
 {
@@ -29,8 +29,8 @@ int main(int argc, char** argv)
     }
 
     // Number of rays
-    const int ray_count = atoi(argv[2]);
-    if (ray_count < 1)
+    const int num_primary_rays = atoi(argv[2]);
+    if (num_primary_rays < 1)
     {
         std::cerr << "Ray count must be greater than 0" << std::endl;
         exit(1);
@@ -122,24 +122,41 @@ int main(int argc, char** argv)
     }
     }
 
-    DEBUG(DB_GENERAL, std::cout << "Densities initialized" << std::endl << std::endl);
+    std::cout << "Serial version" << std::endl << std::endl;
+
+    // Print parameters
+    std::cout << "Listing parameters" << std::endl;
+    std::cout << "Grid side length N: " << N << std::endl;
+    std::cout << "Source offset distance D / N: " << PARAM_D << std::endl;
+    std::cout << "Source angle mean, std dev: " << PARAM_MEAN << ", " << PARAM_SIGMA << std::endl;
+    std::cout << "Initial primary ray energy E0: " << PARAM_E0 << std::endl;
+    std::cout << "Interaction probability scaling a: " << PARAM_A << std::endl;
+    std::cout << "Primary ray energy deposit fraction f: " << PARAM_F << std::endl;
+    std::cout << "Secondary ray energy deposit constant g: " << PARAM_G << std::endl;
+    std::cout << "Number of secondary rays per primary k_s: " << PARAM_KS << std::endl;
+    std::cout << std::endl;
 
     // Write densities
     std::cout << "Writing densities" << std::endl;
+    std::cout << std::endl;
     s.write_densities_to_file("densities.csv");
 
+    // Run a given number of rays
+    std::cout << "Spawning and running " << num_primary_rays << " primary rays" << std::endl;
+
+    // Start timer
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Run a given number of rays
-    std::cout << "Spawning and running " << ray_count << " primary rays" << std::endl;
-    int batch_size = 10000;
-    s.run_serial(ray_count, batch_size);
+    int batch_size = 100; // run in batches to avoid segfaults
+    s.run_serial(num_primary_rays, batch_size);
 
+    // Stop timer
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     std::cout << "Elapsed time: " << elapsed.count() << " s" << std::endl;
 
     // Write result
+    std::cout << std::endl;
     std::cout << "Writing doses" << std::endl;
     s.write_doses_to_file("doses.csv");
 

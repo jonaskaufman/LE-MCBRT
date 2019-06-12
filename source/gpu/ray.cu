@@ -1,4 +1,5 @@
 #include "ray.cuh"
+
 #include <assert.h>
 
 CUDA_CALLABLE_MEMBER Ray::Ray(bool primary, double angle, Pixel pixel, PIXEL_EDGE edge, double edge_dist, double energy)

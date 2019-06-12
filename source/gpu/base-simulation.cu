@@ -1,5 +1,9 @@
 #include "base-simulation.cuh"
-#include <stdio.h>
+
+#include <cmath>
+#include <fstream>
+#include <iostream>
+#include <random>
 
 // Needed to move this to .cu
 std::default_random_engine random_engine{(uint_fast32_t)time(0)}; // seeded random number generator
@@ -112,7 +116,7 @@ __device__ void init_curand_state(curandState_t* state)
     // Initialize random kernel
     int tId = threadIdx.x + (blockIdx.x * blockDim.x);
     curand_init((unsigned long long)clock(), tId, 0, state);
-    // printf("myID: %d\n", tId);
+
     return;
 }
 
@@ -160,7 +164,7 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
     // Randomly select source angle from normal distribution
     double source_angle = random_source_angle(true);
 
-    printf("block %d, thread %d spawning primary ray with angle %0.5f\n", blockIdx.x, threadIdx.x, source_angle);
+    //printf("block %d, thread %d spawning primary ray with angle %0.5f\n", blockIdx.x, threadIdx.x, source_angle);
 
     // Calculate initial ray position
     double horiz_dist_from_center = PARAM_D * N * tan(source_angle); // horizontal distance from center of top edge
@@ -171,7 +175,7 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
     if (horiz_dist_from_left < 0 || horiz_dist_from_left >= N ||
         (source_angle >= M_PI / 2 && source_angle <= 3 * M_PI / 2))
     {
-        // DEBUG(DB_INIT_PRI, std::cout << "New primary ray missed the grid, not adding" << std::endl);
+        return;
     }
     else
     {
@@ -182,17 +186,12 @@ __device__ void spawn_primary_ray(RayGroup* group, int N)
         double edge_dist = horiz_dist_from_left - horiz_dist_from_left_rounded;
         group->my_rays[group->my_size] = Ray::primary(source_angle, spawn_pixel, PIXEL_EDGE::TOP, edge_dist);
         group->my_size++;
-        // DEBUG(DB_INIT_PRI, std::cout << "New primary ray added at pixel " << pixel.first << "," << pixel.second
-        //                                     << " with angle " << source_angle << std::endl);
     }
     return;
 }
 
 __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double total_energy, int N)
 {
-    // DEBUG(DB_INIT_SEC, std::cout << "Spawning " << PARAM_KS << " secondary rays from pixel " << spawn_pixel.first <<
-    // ","
-    //                                 << spawn_pixel.second << "..." << std::endl);
     for (int i = 0; i < PARAM_KS; i++)
     {
         double source_angle = random_source_angle(false); // uniform random source angle
@@ -201,17 +200,16 @@ __device__ void spawn_secondary_rays(RayGroup* group, Pixel spawn_pixel, double 
         Pixel current_pixel = new_ray.get_current_pixel();
         if (out_of_bounds(current_pixel, N))
         {
-            // DEBUG(DB_INIT_SEC, std::cout << "Ray is out of bounds, not adding" << std::endl);
+            // Ray is out of bounds, not adding
+            continue;
         }
         else
         {
             group->my_rays[group->my_size] = new_ray;
-            group->my_size++;
-
-            // DEBUG(DB_INIT_SEC, std::cout << "Ray is in bounds, adding" << std::endl);
+            group->my_size++; 
         }
     }
-    // DEBUG(DB_INIT_SEC, std::cout << "Done" << std::endl << std::endl);
+
     return;
 }
 
@@ -241,10 +239,9 @@ transfer_energy(Ray* ray, Pixel target_pixel, double unscaled_energy, double* de
 
     // Remove energy from ray and add it to pixel dose
     ray->set_current_energy(current_ray_energy - energy_to_transfer);
-    // printf("Attempting to transfer %0.6f energy\n", energy_to_transfer);
-    // printf("Pixel energy before transfer: %0.6f\n", doses[i * N + j]);
+
     doses[i * N + j] += energy_to_transfer;
-    // printf("Pixel energy after transfer: %0.6f\n", doses[i * N + j]);
+
     return;
 }
 
@@ -259,7 +256,6 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
         if (r->is_active())
         {
             // Trace ray
-            // DEBUG(DB_TRACE, std::cout << "Tracing ray " << i << std::endl);
             TraceHistory rtrace = r->trace();
             Pixel visited_pixel = rtrace.visited;
             double travel_distance = rtrace.distance; // distance traveled in visited pixel
@@ -267,53 +263,28 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
 
             if (r->is_primary()) // primary ray
             {
-                // DEBUG(DBevolve_PRI, std::cout << "Primary ray " << i << "  visited pixel " << visited_pixel.first
-                //                                               << "," << visited_pixel.second << " with travel dist "
-                //                                               << travel_distance
-                //                                               << std::endl);
                 if (random_interact(visited_pixel, travel_distance, densities, N))
                 {
-                    printf("block %d, thread %d primary ray interacted at pixel %d,%d\n", blockIdx.x, threadIdx.x,
-                           visited_pixel.first, visited_pixel.second);
-                    // DEBUG(DBevolve_PRI, std::cout << "Primary ray " << i << " interacted" << std::endl);
                     // Deposit energy to pixel
-                    // DEBUG(DBevolve_PRI, std::cout << "Depositing energy to pixel" << std::endl);
-                    // DEBUG(DBevolve_PRI, std::cout << "Starting energy " << r->get_current_energy() << std::endl);
-                    printf("distance traveled %0.6f\n", travel_distance);
                     double energy_to_deposit = PARAM_F * travel_distance * r->get_current_energy();
                     transfer_energy(r, visited_pixel, energy_to_deposit, densities, doses, N);
-                    // DEBUG(DBevolve_PRI, std::cout << "Energy after deposit " << r->get_current_energy() <<
-                    // std::endl); DEBUG(DBevolve_PRI, std::cout << "Will spawn secondary rays next" << std::endl <<
-                    // std::endl); Spawn secondary rays, transferring remaining energy to them
+
+                    // Spawn secondary rays, transferring remaining energy to them
                     spawn_secondary_rays(group, visited_pixel, r->get_current_energy(), N);
                     r->set_current_energy(0);
-                }
-                else
-                {
-                    // DEBUG(DBevolve_PRI, std::cout << "No interaction" << std::endl << std::endl);
                 }
             }
             else // secondary ray
             {
-                // DEBUG(DBevolve_SEC, std::cout << "Secondary ray " << i << " visited pixel " << visited_pixel.first
-                //                                               << "," << visited_pixel.second << " with travel dist "
-                //                                               << travel_distance
-                //                                               << std::endl);
+
                 double energy_to_deposit = PARAM_G * travel_distance;
-                // DEBUG(DBevolve_SEC, std::cout << "Depositing energy to pixel" << std::endl);
-                // DEBUG(DBevolve_SEC, std::cout << "Starting energy " << r->get_current_energy() << std::endl);
-                // DEBUG(DBevolve_SEC, std::cout << "Unscaled energy to deposit " << energy_to_deposit << std::endl);
+
                 transfer_energy(r, visited_pixel, energy_to_deposit, densities, doses, N);
-                // DEBUG(DBevolve_SEC, std::cout << "Energy after deposit " << r->get_current_energy() << std::endl
-                //                                               << std::endl);
             }
 
             // Deactivate ray if out of energy or outside of the grid bounds
             if (r->get_current_energy() < PARAM_EPSILON || out_of_bounds(r->get_current_pixel(), N))
             {
-                // DEBUG(DBevolve_SEC, std::cout << "Ray " << i << " is out of energy or bounds, deactivating"
-                //                                               << std::endl
-                //                                               << std::endl);
                 r->deactivate();
             }
         }
@@ -324,13 +295,10 @@ __device__ int evolve_rays(RayGroup* group, double* densities, double* doses, in
 __device__ void evolve_to_completion(RayGroup* group, double* densities, double* doses, int N)
 {
     int rays_evolved = group->my_size;
-    //  int raysevolved = ray_group->size();
+
     while (rays_evolved > 0)
     {
         rays_evolved = evolve_rays(group, densities, doses, N);
-        // DEBUG(DB_GENERAL, std::cout << raysevolved << " rays evolved" << std::endl);
-        // DEBUG(DB_GENERAL, std::cout << (ray_group->size() - prev_num_rays) << " rays added" << std::endl <<
-        // std::endl)
     }
 
     return;
@@ -340,9 +308,7 @@ __device__ void run_serial(int num_primary_rays, double* densities, double* dose
     // Each primary ray is done serially as its own individual ray group
     for (int i = 0; i < num_primary_rays; i++)
     {
-        printf("Hello from block %d, thread %d. I'm running primary ray %d\n", blockIdx.x, threadIdx.x, i);
-        // Just running one primary ray (and its secondaries) at a time for now
-        // TODO: might want to change how memory allocation/reallocation is done
+        // printf("Hello from block %d, thread %d. I'm running primary ray %d\n", blockIdx.x, threadIdx.x, i);
         RayGroup primary_ray_group;
         int max_num_rays = 1 + PARAM_KS; // at most one primary ray plus all secondaries
         Ray* rays;
@@ -350,22 +316,20 @@ __device__ void run_serial(int num_primary_rays, double* densities, double* dose
         primary_ray_group.my_rays = rays;
         primary_ray_group.my_size = 0;
 
-        // DEBUG(DB_INIT_PRI, std::cout << "Spawning " << num_primary_rays << " primary rays..." << std::endl);
         spawn_primary_ray(&primary_ray_group, N);
-        // DEBUG(DB_INIT_PRI, std::cout << "Done, " << ray_group.size() << " rays added" << std::endl << std::endl);
-        // DEBUG(DB_GENERAL, std::cout << "Evolving rays..." << std::endl)
+
         evolve_to_completion(&primary_ray_group, densities, doses, N);
-        // DEBUG(DB_GENERAL, std::cout << "Done" << std::endl);
+
         free(primary_ray_group.my_rays);
     }
     return;
 }
 
 /// Kernel function for base-GPU
-__global__ void run_rays(int num_primary_rays, double* densities, double* doses, int N)
+__global__ void run_rays(int total_num_primary_rays, double* densities, double* doses, int N)
 {
     int thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (thread_index < num_primary_rays)
+    if (thread_index < total_num_primary_rays)
     {
         run_serial(1, densities, doses, N);
     }

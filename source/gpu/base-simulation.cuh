@@ -4,25 +4,10 @@
 #include "../parameters.hpp"
 #include "ray.cuh"
 
-// TODO do we need to include all these?
-#include <chrono>
-#include <cmath>
-#include <fstream>
-#include <iostream>
-#include <random>
-#include <thread>
-#include <time.h>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include <curand.h>
 #include <curand_kernel.h>
+#include <vector>
 
-// TODO I made N a function argument for now, but we could just define it globally
-// Passing it along is a little annoying I suppose
-
-/// TODO I just made this a struct for now
 /// Struct to hold and manage an array of rays
 /// Assuming my_rays is initialized to some known length,
 /// but you might only have my_size rays actually stored
@@ -94,6 +79,6 @@ __device__ void evolve_to_completion(RayGroup* group, double* densities, double*
 __device__ void run_serial(int num_primary_rays, double* densities, double* doses, int N);
 
 /// Kernel function: Run num_primary_rays with one primary ray per thread
-__global__ void run_rays(int num_primary_rays, double* densities, double* doses, int N);
+__global__ void run_rays(int total_num_primary_rays, double* densities, double* doses, int N);
 
 #endif

@@ -4,15 +4,8 @@
 #include "../parameters.hpp"
 #include "ray.cuh"
 
-// TODO do we need to include all these?
-#include <cmath>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <fstream>
-#include <iostream>
-#include <random>
-#include <thread>
-#include <time.h>
 #include <vector>
 
 #define error_check(ans)                                                                                               \

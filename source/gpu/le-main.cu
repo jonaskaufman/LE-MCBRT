@@ -44,10 +44,9 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    // Set up grids
     // NOTE: all 2D arrays unwrapped as 1D arrays/vectors use linear indexing
     // of the form i,j -> i + j * edge_dimension
-
-    // Set up grids
     DEBUG(DB_HOST, std::cout << "Starting simulation, allocating grids" << std::endl);
     double *densities, *doses;
     cudaMallocManaged(&densities, N * N * sizeof(double));
@@ -56,8 +55,8 @@ int main(int argc, char** argv)
     // Initialize densities and doses
     DEBUG(DB_HOST, std::cout << "Initializing doses to zero" << std::endl);
     initialize_doses(doses, N);
-    DEBUG(DB_HOST, std::cout << "Initializing densities" << std::endl);
 
+    DEBUG(DB_HOST, std::cout << "Initializing densities" << std::endl);
     // Initialize densities according to given method
     int init_method_arg = 4;
     switch (argv[init_method_arg][0])
@@ -140,37 +139,54 @@ int main(int argc, char** argv)
     }
     }
 
-    DEBUG(DB_GENERAL, std::cout << "Densities initialized" << std::endl << std::endl);
+    std::cout << "LE-GPU version" << std::endl << std::endl;
+
+    // Print parameters
+    std::cout << "Listing parameters" << std::endl;
+    std::cout << "Grid side length N: " << N << std::endl;
+    std::cout << "Source offset distance D / N: " << PARAM_D << std::endl;
+    std::cout << "Source angle mean, std dev: " << PARAM_MEAN << ", " << PARAM_SIGMA << std::endl;
+    std::cout << "Initial primary ray energy E0: " << PARAM_E0 << std::endl;
+    std::cout << "Interaction probability scaling a: " << PARAM_A << std::endl;
+    std::cout << "Primary ray energy deposit fraction f: " << PARAM_F << std::endl;
+    std::cout << "Secondary ray energy deposit constant g: " << PARAM_G << std::endl;
+    std::cout << "Number of secondary rays per primary k_s: " << PARAM_KS << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Region side length M: " << M << std::endl;
+    std::cout << "Threads per block: " << GPU_BLOCK_SIZE << std::endl;
+    std::cout << std::endl;
 
     // Write densities
     std::cout << "Writing densities" << std::endl;
+    std::cout << std::endl;
     write_to_csv_file(densities, N, "densities.csv");
 
-    // Set up region groups
+    // Spawn and group the given number of rays on host and then run them on threads
+    std::cout << "Spawning and running " << num_primary_rays << " primary rays" << std::endl;
+
+    // Start timer
+    auto start = std::chrono::high_resolution_clock::now();
+
     int L = N / M;           // number of regions per side
     int num_regions = L * L; // total number of regions
     DEBUG(DB_HOST, std::cout << "Number of regions: " << num_regions << std::endl);
     int max_rays_per_ray_group = PARAM_KS + 1;           // initial capacity of a ray group
     std::vector<RegionGroup> region_groups(num_regions); // vector of region groups
 
-    // TIMER START
-    auto start = std::chrono::high_resolution_clock::now();
-    // Run a given number of rays
-    std::cout << "Spawning and running " << num_primary_rays << " primary rays" << std::endl;
     DEBUG(DB_HOST, std::cout << "Spawning primary rays to region groups" << std::endl);
-    // Spawn primary rays to region groups (vector is passed by reference)
     spawn_primary_rays(region_groups, num_primary_rays, max_rays_per_ray_group, N, M);
 
     DEBUG(DB_HOST, std::cout << "Running region groups" << std::endl);
-    // Run region groups until complete
     run_region_groups(region_groups, densities, doses, N, M);
 
-    // TIMER END
+    // Stop timer
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     std::cout << "Elapsed time: " << elapsed.count() << " s" << std::endl;
 
     // Write result
+    std::cout << std::endl;
     std::cout << "Writing doses" << std::endl;
     write_to_csv_file(doses, N, "doses.csv");
 
